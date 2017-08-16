@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
 	memset(&g_conf, 0, sizeof(g_conf));
 	g_conf.loglevel = "DEBUG";
 
-	logmsg(LOG_INFO, "PL/SQL Filesystem, FUSE v%d.%d", FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
+	logmsg(LOG_INFO, "DDL Filesystem for Oracle Database, FUSE v%d.%d", FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
 	
 	g_conf.mountpoint = realpath(argv[argc-1], NULL);
 	logmsg(LOG_DEBUG, ".. mounting at [%s]", g_conf.mountpoint);
@@ -48,7 +48,8 @@ int main(int argc, char *argv[]) {
 		.open     = fs_open,
         .create   = fs_create,
         .truncate = fs_truncate,
-		.release  = fs_release
+		.release  = fs_release,
+        .unlink   = fs_unlink
 	};
 	
 	ora_connect(

@@ -170,7 +170,7 @@ int qry_objects(t_fsentry *schema, t_fsentry *type) {
 	int retval = EXIT_SUCCESS;
 	char *query = "select \
 object_name, to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t_modified \
-from dba_objects where owner=:bind_owner and object_type=:bind_type";	
+from all_objects where owner=:bind_owner and object_type=:bind_type";	
 
 	OCIStmt   *o_stm = NULL;
 	OCIDefine *o_def[2] = {NULL, NULL};
@@ -408,4 +408,29 @@ qry_object_cleanup:
 		logmsg(LOG_ERROR, "Unable to close FILE* (qry_object_cleanup)");
 	
 	return retval;
+}
+
+int qry_exec_ddl(char *ddl) {
+    int retval = EXIT_SUCCESS;
+    OCIStmt *stm = NULL;
+    
+    if (ora_stmt_prepare(&stm, ddl)) {
+        return EXIT_FAILURE;
+    }
+
+    logmsg(LOG_DEBUG, "Executing DDL (%s)", ddl);
+    
+    if (ora_stmt_execute(stm, 1)) {
+        retval = EXIT_FAILURE;
+        goto qry_exec_ddl_cleanup;
+    }
+
+    logmsg(LOG_DEBUG, "Executed DDL: [%s]", ddl);
+
+qry_exec_ddl_cleanup:
+
+    if (stm != NULL)
+        ora_stmt_free(stm);
+
+    return retval;
 }

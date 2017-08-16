@@ -33,3 +33,9 @@ int qry_object_fname(const char *schema,
 					 const char *type,
 					 const char *object,
 					 char **fname);
+
+/**
+ * Execute DDL statement.
+ * */
+int qry_exec_ddl(char *ddl);
+

@@ -318,6 +318,8 @@ int fs_release(const char *path,
 		newLen++;
 		buf[newLen] = '\0';
 
+        qry_exec_ddl(buf);
+        
 		logmsg(LOG_DEBUG, "Write Buffer [%s]", buf);
 	}
 
@@ -345,7 +347,36 @@ int fs_create (const char *path,
                mode_t mode,
                struct fuse_file_info *fi) {
 
+    struct stat st;
+    char **part;
+    int depth;
+    char empty_ddl[1024] = "";
     logmsg(LOG_INFO, "fs_create() - [%s]", path);
+
+    if (fs_getattr(path, &st) == -ENOENT) {
+        logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
+        
+        depth = fs_path_create(&part, path);
+        logmsg(LOG_INFO, ".. depth=[%d]", depth);
+        if (depth != 3) {
+            logmsg(LOG_ERROR, "Creating of new objects is only allowed on depth level 3");
+            return -EINVAL;
+        }
+         
+        if (strcmp(part[DEPTH_TYPE], "PROCEDURE") == 0) {
+            snprintf(empty_ddl, 1023, "CREATE PROCEDURE \"%s\".\"%s\" AS\nBEGIN\n    NULL;\nEND;",
+                part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
+        } else {
+            logmsg(LOG_ERROR, "Cannot create empty object of type [%s]", part[DEPTH_TYPE]);
+            // @todo - support other object types
+            return -EINVAL; // invalid argument 
+        }
+        
+        qry_exec_ddl(empty_ddl);
+
+        fs_path_free(part);
+    }
+    
     return fs_open(path, fi);
 }
 
@@ -357,4 +388,28 @@ int fs_truncate(const char *path,
     return 0;
 }
 
+int fs_unlink(const char *path) {
+    logmsg(LOG_INFO, "fs_unlink() - [%s]", path);
+    
+    char **part;
+    int depth = fs_path_create(&part, path);
+    char drop_ddl[1024] = "";
+    
+    if (depth != 3) {
+        logmsg(LOG_ERROR, "Cannot unlink objects which are not at level 3");
+        return -EINVAL;
+    }
 
+    if (strcmp(part[DEPTH_TYPE], "PROCEDURE") == 0) {
+        snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"", 
+            part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
+    } else {
+        logmsg(LOG_ERROR, "Cannot drop object %s.%s, operation not (yet?) supported.", 
+            part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
+        return -EINVAL;
+    }
+    fs_path_free(part);
+    
+    qry_exec_ddl(drop_ddl);
+    return 0;
+}
