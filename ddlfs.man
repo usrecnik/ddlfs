@@ -1,0 +1,43 @@
+.TH ddlfs 5
+
+.SH NAME
+ddlfs \- Represent Oracle Database objects as their DDL stored in .sql files.
+
+.SH DESCRIPTION
+@todo - write a description
+
+.SH MOUNT OPTIONS
+This section describes mount options specific to
+ddlfs. Other generic mount options may be used as well; 
+see \fBmount\fR(8) and \fBfuse\fR(8) for details.
+
+.TP
+.BR database=\fIstr\fR
+Oracle EasyConnect string, used to connect to database (host:port/service).
+
+.TP
+.BR username=\fIstr\fR
+Username used to connect to database specified by \fBdatabase\fR parameter.
+
+.TP
+.BR password=\fIstr\fR
+Password used to connect to database specified by \fBdatabase\fR parameter.
+
+.TP
+.BR schemas=\fIstr\fR
+Schema or list of schemas, separated by ':'. You may specify (multiple) partial schema name(s) using '%'
+sign, e.g.: 'APP_%:BLA_%', which would match all schemas with names starting with either 'APP_' or 'BLA_'.
+It defaults to value specified by \fBusername\fR parameter.
+
+Those are the schemas of which objects are exported as .sql files.
+
+.TP
+.BR loglevel=\fR[\fIDEBUG\fR|\fIINFO\fR|\fIERROR\fR]
+Defines verbosity level used for stdout messages.
+
+.TP
+.BR temppath=\fI/tmp\fR
+Where to store temporary files - offline copies of DDL statements while their files are open. 
+\fI/tmp\fR location is used by default. All files created by \fBddlfs\fR are prefixed by ddlfs-<PID> in this folder.
+
+
