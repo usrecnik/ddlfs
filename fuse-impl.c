@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "vfs.h"
 #include "logging.h"
@@ -343,6 +344,7 @@ fs_release_final:
 	return retval;
 }
 
+// @todo - fs_create() does not yet honour g_conf.lowercase setting.
 int fs_create (const char *path, 
                mode_t mode,
                struct fuse_file_info *fi) {
@@ -350,20 +352,26 @@ int fs_create (const char *path,
     struct stat st;
     char **part;
     int depth;
+    char *object_type = NULL;
     char empty_ddl[1024] = "";
     logmsg(LOG_INFO, "fs_create() - [%s]", path);
 
+    
     if (fs_getattr(path, &st) == -ENOENT) {
         logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
         
         depth = fs_path_create(&part, path);
+        object_type = strdup(part[DEPTH_TYPE]);
+        for (int i = 0; i < strlen(object_type); i++)
+            object_type[i] = toupper(object_type[i]);
+        
         logmsg(LOG_INFO, ".. depth=[%d]", depth);
         if (depth != 3) {
             logmsg(LOG_ERROR, "Creating of new objects is only allowed on depth level 3");
             return -EINVAL;
         }
          
-        if (strcmp(part[DEPTH_TYPE], "PROCEDURE") == 0) {
+        if (strcmp(object_type, "PROCEDURE") == 0) {
             snprintf(empty_ddl, 1023, "CREATE PROCEDURE \"%s\".\"%s\" AS\nBEGIN\n    NULL;\nEND;",
                 part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
         } else {
@@ -376,6 +384,9 @@ int fs_create (const char *path,
 
         fs_path_free(part);
     }
+    
+    if (object_type != NULL)
+        free(object_type);
     
     return fs_open(path, fi);
 }

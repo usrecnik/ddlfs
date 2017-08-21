@@ -501,19 +501,39 @@ qry_object_cleanup:
 int qry_exec_ddl(char *ddl) {
     int retval = EXIT_SUCCESS;
     OCIStmt *stm = NULL;
+    char *ddl_msg = malloc(120 * sizeof(char));
+    if (ddl_msg == NULL) {
+        logmsg(LOG_ERROR, "qry_exec_ddl() - unable to malloc ddl_msg");
+        return EXIT_FAILURE;
+    }
+
+    // prepare log message (first 120 characters without newlines)
+    strncpy(ddl_msg, ddl, 119);
+    ddl_msg[119] = '\0';
+    for (int i = 0; i < 120; i++) {
+        switch (ddl_msg[i]) {
+            case '\n':
+            case '\r':
+            case '\t':
+                ddl_msg[i] = ' ';
+        }
+    }
+    logddl(ddl_msg);
     
     if (ora_stmt_prepare(&stm, ddl)) {
         return EXIT_FAILURE;
     }
 
-    logmsg(LOG_DEBUG, "Executing DDL (%s)", ddl);
-    
+    logmsg(LOG_DEBUG, "Executing DDL (%s)", ddl); // @todo - remove this debug messages
+ 
     if (ora_stmt_execute(stm, 1)) {
         retval = EXIT_FAILURE;
+        logddl(".. FAILURE!"); // @todo - get description from user_errors
         goto qry_exec_ddl_cleanup;
     }
-
-    logmsg(LOG_DEBUG, "Executed DDL: [%s]", ddl);
+    logddl(".. SUCCESS\n");
+    
+    logmsg(LOG_DEBUG, "Executed DDL: [%s]", ddl); // @todo - remove this debug message
 
 qry_exec_ddl_cleanup:
 
