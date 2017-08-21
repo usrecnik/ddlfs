@@ -5,7 +5,8 @@
 #include <search.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <unistd.h>   
+#include <unistd.h>
+#include <ctype.h>
 
 #include "config.h"
 #include "logging.h"
@@ -13,10 +14,16 @@
 #include "vfs.h"
 
 #define LOB_BUFFER_SIZE    8192
-#define QRY_TYPE_FUNCTION  "FUNCTION"
-#define QRY_TYPE_PACKAGE   "PACKAGE"
-#define QRY_TYPE_PROCEDURE "PROCEDURE"
-#define QRY_TYPE_VIEW      "VIEW"
+
+static void str_lower(char *str) {
+    for (int i = 0; str[i]; i++)
+        str[i] = tolower(str[i]);
+}
+
+static void str_upper(char *str) {
+    for (int i = 0; str[i]; i++)
+        str[i] = toupper(str[i]);
+}
 
 static int str_append(char **dst, char *src) {
 	int len = (*dst == NULL ? strlen(src) : strlen(*dst) + strlen(src));
@@ -105,7 +112,7 @@ int qry_schemas() {
 	}
 	str_append(&query, " ORDER BY username");
 	
-	//logmsg(LOG_DEBUG, "query=[%s]", query);
+	// logmsg(LOG_DEBUG, "query=[%s]", query);
 	// prepare and execute sql statement
 	if (ora_stmt_prepare(&o_stm, query)) {
 		retval = EXIT_FAILURE;
@@ -130,11 +137,13 @@ int qry_schemas() {
 		retval = EXIT_FAILURE;
 		goto qry_schemas_cleanup;
 	}	
- 
+    
 	vfs_entry_free(g_vfs, 1);
-
+    
 	// loop through query results	
 	while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+        if (g_conf.lowercase)
+            str_lower((char*) o_sel);
 		t_fsentry *entry = vfs_entry_create('D', o_sel, time(NULL), time(NULL));
 		vfs_entry_add(g_vfs, entry);
 	}	
@@ -158,12 +167,35 @@ qry_schemas_cleanup:
 	return retval;
 }
 
-void qry_types(t_fsentry *schema) {
+int qry_types(t_fsentry *schema) {
 	vfs_entry_free(schema, 1);
-	vfs_entry_add(schema, vfs_entry_create('D', QRY_TYPE_FUNCTION,  time(NULL), time(NULL)));
-	vfs_entry_add(schema, vfs_entry_create('D', QRY_TYPE_PACKAGE,   time(NULL), time(NULL)));
-	vfs_entry_add(schema, vfs_entry_create('D', QRY_TYPE_PROCEDURE, time(NULL), time(NULL)));
-	vfs_entry_add(schema, vfs_entry_create('D', QRY_TYPE_VIEW,      time(NULL), time(NULL)));
+    
+    char *types[] = {
+        "function",
+        "package_body",
+        "package_spec",
+        "procedure",
+        "view",
+        NULL
+    };
+
+    for (int i = 0; types[i] != NULL; i++) {
+        char *type = strdup(types[i]);
+        if (type == NULL) {
+            logmsg(LOG_ERROR, "qry_types() - unable to strdup type");
+            return EXIT_FAILURE;
+        }
+        
+        if (g_conf.lowercase)
+            str_lower(type);
+        else
+            str_upper(type);
+    
+        vfs_entry_add(schema, vfs_entry_create('D', type,  time(NULL), time(NULL)));
+        free(type);
+    }
+    
+    return EXIT_SUCCESS;
 }
 
 int qry_objects(t_fsentry *schema, t_fsentry *type) {
@@ -177,6 +209,17 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
 	OCIBind   *o_bnd[2] = {NULL, NULL};
 	char      *o_sel[2] = {NULL, NULL};
 
+    char *schema_name = strdup(schema->fname);
+    char *type_name = strdup(type->fname);
+    if (type_name == NULL || schema_name == NULL) {
+        logmsg(LOG_ERROR, "qry_objects() - Unable to strdup type_name and/or schema_name");
+        return EXIT_FAILURE;
+    }
+    if (g_conf.lowercase) {
+        str_upper(schema_name);
+        str_upper(type_name);
+    }        
+    
 	struct tm *temptime = malloc(sizeof(struct tm)); // @todo - free me
 
 	vfs_entry_free(type, 1);
@@ -202,12 +245,12 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
 		goto qry_objects_cleanup;
 	}
 
-    if (ora_stmt_bind(o_stm, &o_bnd[0], 1, (void*) schema->fname, strlen(schema->fname)+1, SQLT_STR)) {
+    if (ora_stmt_bind(o_stm, &o_bnd[0], 1, (void*) schema_name, strlen(schema_name)+1, SQLT_STR)) {
 		retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
 	}
 
-	if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) type->fname, strlen(type->fname)+1, SQLT_STR)) {
+	if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) type_name, strlen(type_name)+1, SQLT_STR)) {
 		retval = EXIT_FAILURE;
 		goto qry_objects_cleanup;
 	}
@@ -228,17 +271,28 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
 		}
 
 		time_t t_modified = timegm(temptime);
-		
+		char *fname = malloc((strlen((char*)o_sel[0])+4)*sizeof(char));
+        strcpy(fname, (char*) o_sel[0]);
+        strcat(fname, ".SQL");
+
+        if (g_conf.lowercase)
+            str_lower(fname);
+        
 		t_fsentry *entry = vfs_entry_create('F', 
-			((char*)o_sel[0]), 
+			fname, 
 			t_modified, 
 			t_modified);
-
+       
+        free(fname);
 		vfs_entry_add(type, entry);	
+        logmsg(LOG_DEBUG, ".. OBJECT [%s]", entry->fname);
 	}
 
 qry_objects_cleanup:
-	
+
+    if (type_name != NULL)
+        free(type_name);	
+
 	if (temptime != NULL)
 		free(temptime);
 	
@@ -261,7 +315,7 @@ int qry_object_fname(const char *schema,
 		logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", PATH_MAX);
 		return EXIT_FAILURE;
 	}
-	snprintf(*fname, PATH_MAX, "%s/%d-%s.%s.%s.tmp", 
+	snprintf(*fname, PATH_MAX, "%s/ddlfs-%d-%s.%s.%s.tmp", 
 		g_conf.temppath, getpid(), schema, type, object);
 	return EXIT_SUCCESS;
 }
@@ -277,31 +331,55 @@ int qry_object(const char *schema,
 :bind_type, :bind_object, :bind_schema) \
 as retval from dual";
 
+    char *object_schema = NULL; // those three variables represent object in correct case 
+    char *object_type = NULL;   // according to g_conf.lowercase;
+    char *object_name = NULL;   // object_name is also stripped of ".sql" suffix
 
-	OCILobLocator *o_lob = NULL; // clean	
-	OCIStmt 	  *o_stm = NULL; // clean
+	OCILobLocator *o_lob = NULL; // free
+	OCIStmt 	  *o_stm = NULL; // free
 	OCIDefine 	  *o_def = NULL; // i *assume* following for OCIDefine as well:
 	OCIBind 	  *o_bn1 = NULL; // The bind handles re freed implicitly when 
 	OCIBind 	  *o_bn2 = NULL; // when the statement handle is deallocated.
 	OCIBind 	  *o_bn3 = NULL;
 	
-	char *buf = malloc(LOB_BUFFER_SIZE); // clean
+	char *buf = malloc(LOB_BUFFER_SIZE); // free
 	oraub8 buf_blen = LOB_BUFFER_SIZE;
 	oraub8 buf_clen = 0;
 	int lob_offset = 1;
 
-	FILE *fp = NULL; // clean
+	FILE *fp = NULL; // free
 	*fname = malloc(PATH_MAX * sizeof(char));
+
 	if (*fname == NULL) {
 		logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", PATH_MAX);
 		return EXIT_FAILURE;
 	}
+    
 	size_t bytes_written;
-
-	snprintf(*fname, PATH_MAX, "%s/%d-%s.%s.%s.tmp", 
-		g_conf.temppath, getpid(), schema, type, object);
+    if (qry_object_fname(schema, type, object, fname) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object() - unable to determine filenam, qry_object_fname() failed.");
+        return EXIT_FAILURE;
+    }
 	logmsg(LOG_DEBUG, "Filename=[%s].", *fname);
-	
+
+    // convert names in correct case if necessary and strip ".sql" suffix from the name
+    object_schema = strdup(schema);
+    object_type = strdup(type);
+    object_name = strdup(object);
+    if (object_name == NULL || object_type == NULL || object_name == NULL) {
+        logmsg(LOG_DEBUG, "Unable to malloc object_schema, object_type and/or object_name.");
+        return EXIT_FAILURE;
+    }
+    object_name[strlen(object)-4] = '\0';
+    if (g_conf.lowercase) {
+        str_upper(object_schema);
+        str_upper(object_type);
+        str_upper(object_name);
+    }
+
+    logmsg(LOG_DEBUG, "**** DEBUG, object_name=[%s].[%s] - [%s]", object_schema, object_name, object_type);
+    
+    
 	if (buf == NULL) {
 		logmsg(LOG_ERROR, "Unable to malloc lob buffer (size=%d).", LOB_BUFFER_SIZE);
 		return EXIT_FAILURE;
@@ -322,17 +400,17 @@ as retval from dual";
 		goto qry_object_cleanup;
 	}
    
-    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
+    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) object_type, strlen(object_type)+1, SQLT_STR)) {
 		retval = EXIT_FAILURE;
 		goto qry_object_cleanup;
 	}
 
-	if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object, strlen(object)+1, SQLT_STR))  {
+	if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object_name, strlen(object_name)+1, SQLT_STR))  {
 		retval = EXIT_FAILURE;
 		goto qry_object_cleanup;
 	}
 
-    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
+    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) object_schema, strlen(object_schema)+1, SQLT_STR)) {
 		retval = EXIT_FAILURE;
 		goto qry_object_cleanup;
 	}
@@ -395,6 +473,16 @@ as retval from dual";
 	}
 
 qry_object_cleanup:
+
+    if (object_schema != NULL)
+        free(object_schema);
+
+    if (object_type != NULL)
+        free(object_type);
+
+    if (object_name != NULL)
+        free(object_name);
+    
 	if (buf != NULL)
 		free(buf);
 	

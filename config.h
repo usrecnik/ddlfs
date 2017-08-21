@@ -10,6 +10,7 @@ struct s_global_config {
     char *password;
     char *database;
     char *schemas;
+    int   lowercase;
     char *loglevel;
 } g_conf;
 

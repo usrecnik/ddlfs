@@ -32,6 +32,16 @@ It defaults to value specified by \fBusername\fR parameter.
 Those are the schemas of which objects are exported as .sql files.
 
 .TP
+.BR lowercase
+Convert all filenames to lowercase, ignoring the original case as stored in database. You can only use this option if
+you are sure that all object names have distinct file names when converted to lowercase.
+
+.TP
+.BR nolowercase
+this is the default (inverse option of \fBlowercase\fR) - filenames reflect exact 
+object/schema names as stored in database. 
+
+.TP
 .BR loglevel=\fR[\fIDEBUG\fR|\fIINFO\fR|\fIERROR\fR]
 Defines verbosity level used for stdout messages.
 

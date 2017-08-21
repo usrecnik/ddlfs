@@ -19,6 +19,8 @@ static struct fuse_opt ddlfs_opts[] = {
 	MYFS_OPT("schemas=%s",  schemas,  1),
 	MYFS_OPT("loglevel=%s", loglevel, 1),
 	MYFS_OPT("temppath=%s", temppath, 1),
+    MYFS_OPT("lowercase",   lowercase, 1),
+    MYFS_OPT("nolowercase", lowercase, 0),
 		
     FUSE_OPT_KEY("-h",             KEY_HELP),
     FUSE_OPT_KEY("--help",         KEY_HELP),
@@ -86,12 +88,13 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
 		g_conf.temppath = "/tmp";
 	
 	logmsg(LOG_DEBUG, "Parameters:");
-	logmsg(LOG_DEBUG, ".. username: [%s]", g_conf.username);
-	logmsg(LOG_DEBUG, ".. password: [%s]", g_conf.password);
-	logmsg(LOG_DEBUG, ".. database: [%s]", g_conf.database);
-	logmsg(LOG_DEBUG, ".. loglevel: [%s]", g_conf.loglevel);
-	logmsg(LOG_DEBUG, ".. schemas : [%s]", g_conf.schemas);
-	logmsg(LOG_DEBUG, ".. temppath: [%s]", g_conf.temppath);
+	logmsg(LOG_DEBUG, ".. username : [%s]", g_conf.username);
+	logmsg(LOG_DEBUG, ".. password : [%s]", g_conf.password);
+	logmsg(LOG_DEBUG, ".. database : [%s]", g_conf.database);
+	logmsg(LOG_DEBUG, ".. loglevel : [%s]", g_conf.loglevel);
+	logmsg(LOG_DEBUG, ".. schemas  : [%s]", g_conf.schemas);
+    logmsg(LOG_DEBUG, ".. lowercase: [%d]", g_conf.lowercase);
+	logmsg(LOG_DEBUG, ".. temppath : [%s]", g_conf.temppath);
 	logmsg(LOG_DEBUG, ".");
 	
 	return args;

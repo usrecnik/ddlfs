@@ -10,7 +10,7 @@ void qry_schemas();
 /**
  * Populate g_vfs with list of object types.
  * */
-void qry_types(t_fsentry *schema);
+int qry_types(t_fsentry *schema);
 
 /**
  * Populate g_vfs with list of actual objects (.sql files). 
