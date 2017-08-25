@@ -353,6 +353,8 @@ int fs_create (const char *path,
     char **part;
     int depth;
     char *object_type = NULL;
+    char *object_name = NULL;
+    char *object_schema = NULL;
     char empty_ddl[1024] = "";
     logmsg(LOG_INFO, "fs_create() - [%s]", path);
 
@@ -361,21 +363,45 @@ int fs_create (const char *path,
         logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
         
         depth = fs_path_create(&part, path);
-        object_type = strdup(part[DEPTH_TYPE]);
-        for (int i = 0; i < strlen(object_type); i++)
-            object_type[i] = toupper(object_type[i]);
-        
+        if (str_fn2obj(&object_type, part[DEPTH_TYPE], 0) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+            return -ENOMEM;
+        }
+        if (str_fn2obj(&object_name, part[DEPTH_OBJECT], 1) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+            return -ENOMEM;
+        }
+        if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 1) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
+            return -ENOMEM;
+        }
+         
         logmsg(LOG_INFO, ".. depth=[%d]", depth);
         if (depth != 3) {
             logmsg(LOG_ERROR, "Creating of new objects is only allowed on depth level 3");
             return -EINVAL;
         }
          
-        if (strcmp(object_type, "PROCEDURE") == 0) {
-            snprintf(empty_ddl, 1023, "CREATE PROCEDURE \"%s\".\"%s\" AS\nBEGIN\n    NULL;\nEND;",
-                part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
-        } else {
-            logmsg(LOG_ERROR, "Cannot create empty object of type [%s]", part[DEPTH_TYPE]);
+        if (strcmp(object_type, "PROCEDURE") == 0)
+            snprintf(empty_ddl, 1023, "CREATE PROCEDURE \"%s\".\"%s\" AS\nBEGIN\n    NULL;\nEND;", 
+                object_schema, object_name);
+        else if (strcmp(object_type, "FUNCTION") == 0)
+            snprintf(empty_ddl, 1023, "CREATE FUNCTION \"%s\".\"%s\" RETURN NUMBER AS\nBEGIN\n    RETURN NULL;\nEND;",
+                object_schema, object_name);    
+        else if (strcmp(object_type, "VIEW") == 0)
+            snprintf(empty_ddl, 1023, "CREATE VIEW \"%s\".\"%s\" AS\nSELECT * FROM dual;",
+                object_schema, object_name);
+        else if (strcmp(object_type, "PACKAGE_SPEC") == 0)
+            snprintf(empty_ddl, 1023, "CREATE PACKAGE \"%s\".\"%s\" AS\n\nEND;",
+                object_schema, object_name);
+        else if (strcmp(object_type, "PACKAGE_BODY") == 0)
+            snprintf(empty_ddl, 1023, "CREATE PACKAGE BODY \"%s\".\"%s\" AS\n\nEND;",
+                object_schema, object_name);
+        else if (strcmp(object_type, "JAVA_SOURCE") == 0)
+            snprintf(empty_ddl, 1023, "CREATE AND COMPILE JAVA SOURCE NAMED \"%s\".\"%s\" AS\npublic class %s {\n}",
+                object_schema, object_name, object_name);
+        else {
+            logmsg(LOG_ERROR, "Cannot create empty object of type [%s]- this is not supported.", part[DEPTH_TYPE]);
             // @todo - support other object types
             return -EINVAL; // invalid argument 
         }
@@ -387,6 +413,12 @@ int fs_create (const char *path,
     
     if (object_type != NULL)
         free(object_type);
+    
+    if (object_name != NULL)
+        free(object_name);
+   
+    if (object_schema != NULL)
+        free(object_schema);
     
     return fs_open(path, fi);
 }
@@ -405,16 +437,47 @@ int fs_unlink(const char *path) {
     char **part;
     int depth = fs_path_create(&part, path);
     char drop_ddl[1024] = "";
-    
+    char *object_type = NULL;
+    char *object_name = NULL;
+    char *object_schema = NULL;
+       
+ 
     if (depth != 3) {
         logmsg(LOG_ERROR, "Cannot unlink objects which are not at level 3");
         return -EINVAL;
     }
-
-    if (strcmp(part[DEPTH_TYPE], "PROCEDURE") == 0) {
+    if (str_fn2obj(&object_type, part[DEPTH_TYPE], 0) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+        return -ENOMEM;
+    }
+    if (str_fn2obj(&object_name, part[DEPTH_OBJECT], 1) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+        return -ENOMEM;
+    }
+    if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 1) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
+        return -ENOMEM;
+    }
+        
+    if (strcmp(object_type, "PROCEDURE") == 0)
         snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"", 
-            part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
-    } else {
+            object_schema, object_name);
+    else if (strcmp(object_type, "FUNCTION") == 0)
+        snprintf(drop_ddl, 1023, "DROP FUNCTION \"%s\".\"%s\"",
+            object_schema, object_name);
+    else if (strcmp(object_type, "VIEW") == 0)
+        snprintf(drop_ddl, 1023, "DROP VIEW \"%s\".\"%s\"",
+            object_schema, object_name);
+    else if (strcmp(object_type, "PACKAGE_SPEC") == 0)
+        snprintf(drop_ddl, 1023, "DROP PACKAGE \"%s\".\"%s\"",
+            object_schema, object_name);
+    else if (strcmp(object_type, "PACKAGE_BODY") == 0)
+        snprintf(drop_ddl, 1023, "DROP PACKAGE BODY \"%s\".\"%s\"",
+            object_schema, object_name);
+    else if (strcmp(object_type, "JAVA_SOURCE") == 0)
+        snprintf(drop_ddl, 1023, "DROP JAVA SOURCE \"%s\".\"%s\"",
+            object_schema, object_name);
+    else {
         logmsg(LOG_ERROR, "Cannot drop object %s.%s, operation not (yet?) supported.", 
             part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
         return -EINVAL;
@@ -422,5 +485,15 @@ int fs_unlink(const char *path) {
     fs_path_free(part);
     
     qry_exec_ddl(drop_ddl);
+
+    if (object_type != NULL)
+        free(object_type);
+
+    if (object_schema != NULL)
+        free(object_schema);
+
+    if (object_name != NULL)
+        free(object_name);
+
     return 0;
 }

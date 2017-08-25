@@ -43,6 +43,21 @@ static int str_append(char **dst, char *src) {
 	return EXIT_SUCCESS;
 }
 
+int str_fn2obj(char **dst, char *src, int removeSuffix) {
+    *dst = strdup(src);
+    if (*dst == NULL) {
+        logmsg(LOG_ERROR, "str_fn2obj() - Unable to malloc for dst string.");
+        return EXIT_FAILURE;
+    }
+    if (g_conf.lowercase)
+        str_upper(*dst);
+
+    if (removeSuffix) // remove .sql suffix
+        *dst[strlen(*dst)-4] = '\0';
+
+    return 0;
+}
+
 int qry_schemas() {
 	// variables
 	int retval = EXIT_SUCCESS;
@@ -172,9 +187,14 @@ int qry_types(t_fsentry *schema) {
     
     char *types[] = {
         "function",
+        "java_class"
+        "java_resource",
+        "java_source",
         "package_body",
         "package_spec",
         "procedure",
+        "type",
+        "type_body",
         "view",
         NULL
     };

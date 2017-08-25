@@ -3,6 +3,11 @@
 #include "vfs.h"
 
 /**
+ * Convert filename to correct case and optionally remove suffix (.sql)
+ * */
+int str_fn2obj(char **dst, char *src, int removeSuffix);
+
+/**
  * Populate g_vfs with list of schemas. Those are first-level folder entries.
  * */
 void qry_schemas();
