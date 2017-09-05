@@ -22,6 +22,7 @@
 int main(int argc, char *argv[]) {
 	memset(&g_conf, 0, sizeof(g_conf));
 	g_conf.loglevel = "DEBUG";
+    g_ddl_log_time = time(NULL);
 
 	logmsg(LOG_INFO, "DDL Filesystem for Oracle Database, FUSE v%d.%d", FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
 	

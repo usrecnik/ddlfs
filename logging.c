@@ -67,34 +67,30 @@ void logmsg(int level, const char *msg, ...) {
 }
 
 void logddl(const char *msg, ...) { 
-    if (g_ddl_log_idx == 0)
-        for (int i = 0; i < 0; i++)
-            g_ddl_log[i] = NULL;
     
-    g_ddl_log_idx++;
-    
-    if (g_ddl_log_idx >= DDL_LOG_SIZE)
-        g_ddl_log_idx = 1; // never 0, 0 is always NULL and ignored 
-                           // (so that we don't need to explicitly initialize global 
-                           // variable to something other than 0).
-    
-    if (g_ddl_log[g_ddl_log_idx] != NULL)
-        free(g_ddl_log[g_ddl_log_idx]);
+    if (g_ddl_log_buf == NULL) {
+        g_ddl_log_buf = calloc(DDL_LOG_SIZE, sizeof(char));
+        if (g_ddl_log_buf == NULL) {
+            logmsg(LOG_ERROR, "Unable to allocate memory for in-memory contents of ddlfs.log, size=[%d]", DDL_LOG_SIZE);
+            logmsg(LOG_ERROR, msg);
+            return;
+        }
+    }
 
     va_list args;
     va_start(args, msg);
-    char *tmp = calloc(512, sizeof(char));
-    if (tmp == NULL) {
-        logmsg(LOG_ERROR, "logddl() - Unable to calloc tmp.");
-        return;
+
+    if (DDL_LOG_SIZE - 250 < 0) {
+        logmsg(LOG_ERROR, "ABOUT TO REACH BUFFER OVERFLOW!");
     }
-    vsnprintf(tmp, 512, msg, args); 
- 
-    g_ddl_log[g_ddl_log_idx] = strdup(tmp); 
-    if (g_ddl_log[g_ddl_log_idx] == NULL) {
-        logmsg(LOG_ERROR, "logddl() - unable to strdup() the message");
-        return;
-    }
-    free(tmp);
+
+    char *line = calloc(250, sizeof(char));
+    vsnprintf(line, 249, msg, args);    
+
+    strncat(g_ddl_log_buf, line, 250);
+    strcat(g_ddl_log_buf, "\n");
+    
+    free(line);
+    va_end(args);
 }
 

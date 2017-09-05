@@ -51,9 +51,27 @@ int str_fn2obj(char **dst, char *src, int removeSuffix) {
     }
     if (g_conf.lowercase)
         str_upper(*dst);
-
-    if (removeSuffix) // remove .sql suffix
-        *dst[strlen(*dst)-4] = '\0';
+    
+    if (removeSuffix) {
+        // safety check
+        char suffix[5];
+        int len = strlen(*dst);
+        for (int i = 0; i < 4; i++) {
+            int c = len-i-1;
+            if (c < 0)
+                suffix[i] = '\0';
+            else {
+                suffix[3-i] = (*dst)[c];
+            }
+        }
+        suffix[4] = '\0';
+        if (strcmp(suffix, ".SQL") != 0) {
+            logmsg(LOG_ERROR, "Expected .SQL suffix, got [%s] from [%s]", suffix, *dst);
+            return EXIT_FAILURE;
+        }
+        // remove '.sql' suffix
+        (*dst)[strlen(*dst)-4] = '\0';
+    }
 
     return 0;
 }
@@ -161,7 +179,10 @@ int qry_schemas() {
             str_lower((char*) o_sel);
 		t_fsentry *entry = vfs_entry_create('D', o_sel, time(NULL), time(NULL));
 		vfs_entry_add(g_vfs, entry);
-	}	
+	}
+
+    t_fsentry *ddllog = vfs_entry_create('F', "ddlfs.log", time(NULL), time(NULL));
+    vfs_entry_add(g_vfs, ddllog);
 
 qry_schemas_cleanup:
 	if (input != NULL)
@@ -548,12 +569,11 @@ int qry_exec_ddl(char *ddl) {
  
     if (ora_stmt_execute(stm, 1)) {
         retval = EXIT_FAILURE;
-        logddl(".. FAILURE!"); // @todo - get description from user_errors
+        logddl(".. FAILURE\n"); // @todo - get description from user_errors
         goto qry_exec_ddl_cleanup;
     }
     logddl(".. SUCCESS\n");
     
-    logmsg(LOG_DEBUG, "Executed DDL: [%s]", ddl); // @todo - remove this debug message
 
 qry_exec_ddl_cleanup:
 

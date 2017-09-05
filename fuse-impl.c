@@ -101,13 +101,28 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
 
 int fs_getattr( const char *path, struct stat *st )
 {
-    logmsg(LOG_DEBUG, "fuse-getattr: [%s]", path);
 	//vfs_dump(g_vfs, 1);
 	char **part;
 	int depth = fs_path_create(&part, path);	
 	t_fsentry *entry = fs_vfs_by_path(part, 0);
 	//printf("\n--\n");
 	//vfs_dump(g_vfs, 1);
+
+    if (strcmp(path, "/ddlfs.log") == 0) {
+        st->st_uid = getuid();
+        st->st_gid = getgid();
+        //logmsg(LOG_DEBUG, "Returning mtime as %d", g_ddl_log_time);
+        st->st_atime = g_ddl_log_time;
+        st->st_mtime = g_ddl_log_time;
+        st->st_ctime = g_ddl_log_time;
+        st->st_nlink = 1;
+        st->st_mode = S_IFREG | 0444;
+        st->st_size = (g_ddl_log_buf == NULL ? 0 : strlen(g_ddl_log_buf));
+        return 0;
+    }
+
+    logmsg(LOG_DEBUG, "fuse-getattr: [%s]", path);
+
 	if (entry == NULL) {
 		logmsg(LOG_ERROR, "fuse-getattr: File not found [%s]\n\n", path);
 		return -ENOENT;
@@ -131,10 +146,10 @@ int fs_getattr( const char *path, struct stat *st )
 	
 	if (entry->ftype == 'D') {
 		st->st_nlink = 2;
-		st->st_mode = S_IFDIR | 0755;
+		st->st_mode = S_IFDIR | 0644;
 	} else {
 		st->st_nlink = 1;
-		st->st_mode = S_IFREG | 0755;
+		st->st_mode = S_IFREG | 0644;
 		st->st_size = tmp_st.st_size;
 	}
 	
@@ -218,15 +233,39 @@ int fs_open(const char *path,
 			struct fuse_file_info *fi) {
 
 	logmsg(LOG_INFO, "fuse-open: [%s]", path);
+    if (strcmp(path, "/ddlfs.log") == 0) {
+        fi->direct_io = 1;
+        return 0;
+    }
+    
 	int fh = fake_open(path, fi);
 	if (fh < 0) {
 		logmsg(LOG_ERROR, "Unable to fs_open(%s).", path);
 		return -ENOENT;
 	}
-	fi->direct_io=1;
+	fi->direct_io = 1;
 	fi->fh = fh;
 		
 	return 0;
+}
+
+static int fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    logmsg(LOG_DEBUG, "Reading ddlfs.log...");
+
+    if (g_ddl_log_buf == NULL)
+        return 0;
+
+    size_t len = strlen(g_ddl_log_buf);
+    if (offset >= len)
+        return 0;
+    
+    if (offset + size > len) {
+        memcpy(buf, g_ddl_log_buf + offset, len - offset);
+        return len - offset;
+    }
+
+    memcpy(buf, g_ddl_log_buf + offset, size);
+    return size;
 }
 
 int fs_read(const char *path, 
@@ -239,6 +278,9 @@ int fs_read(const char *path,
 	
 	int fd;
 	int res;
+
+    if (strcmp(path, "/ddlfs.log") == 0)
+        return fs_read_ddl_log(buf, size, offset, fi);
 
 	if (fi == NULL)
 		fd = fake_open(path, NULL);	
@@ -283,15 +325,15 @@ int fs_release(const char *path,
 	size_t buf_len = 0;
 	char *buf = NULL;
 
+    if (strcmp(path, "/ddlfs.log") == 0)
+        return 0;
+
     fs_path_create(&part, path);
 	qry_object_fname(
 		part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
 
 	// read file to buffer
 	if (fi->flags & O_RDWR || fi->flags & O_WRONLY) {
-		// @todo - check if there was at least one write call since the file was open
-		logmsg(LOG_DEBUG, "RW FLAGS!");
-
 		if (fstat(fi->fh, &tmp_stat) != 0) {
 			logmsg(LOG_ERROR, "fs_release() - fstat failed for [%s], fd=%d", fname, fi->fh);
 			retval = -1;
@@ -344,7 +386,7 @@ fs_release_final:
 	return retval;
 }
 
-// @todo - fs_create() does not yet honour g_conf.lowercase setting.
+
 int fs_create (const char *path, 
                mode_t mode,
                struct fuse_file_info *fi) {
@@ -363,25 +405,27 @@ int fs_create (const char *path,
         logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
         
         depth = fs_path_create(&part, path);
+
         if (str_fn2obj(&object_type, part[DEPTH_TYPE], 0) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
             return -ENOMEM;
         }
+
         if (str_fn2obj(&object_name, part[DEPTH_OBJECT], 1) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
             return -ENOMEM;
         }
-        if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 1) != EXIT_SUCCESS) {
+        
+        if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 0) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
             return -ENOMEM;
         }
          
-        logmsg(LOG_INFO, ".. depth=[%d]", depth);
         if (depth != 3) {
             logmsg(LOG_ERROR, "Creating of new objects is only allowed on depth level 3");
             return -EINVAL;
         }
-         
+
         if (strcmp(object_type, "PROCEDURE") == 0)
             snprintf(empty_ddl, 1023, "CREATE PROCEDURE \"%s\".\"%s\" AS\nBEGIN\n    NULL;\nEND;", 
                 object_schema, object_name);
@@ -454,7 +498,7 @@ int fs_unlink(const char *path) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
         return -ENOMEM;
     }
-    if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 1) != EXIT_SUCCESS) {
+    if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 0) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
         return -ENOMEM;
     }
