@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <utime.h>
 
 #include "config.h"
 #include "logging.h"
@@ -398,7 +399,7 @@ as retval from dual";
     
 	size_t bytes_written;
     if (qry_object_fname(schema, type, object, fname) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "qry_object() - unable to determine filenam, qry_object_fname() failed.");
+        logmsg(LOG_ERROR, "qry_object() - unable to determine filename, qry_object_fname() failed.");
         return EXIT_FAILURE;
     }
 	logmsg(LOG_DEBUG, "Filename=[%s].", *fname);
@@ -512,6 +513,18 @@ as retval from dual";
 		}
 		first=0;
 	}
+    if (fclose(fp) != 0)
+        logmsg(LOG_ERROR, "qry_object() - unable to close fp");
+    fp = NULL;
+    
+    // set timestamp
+    struct utimbuf newtime;
+    newtime.actime = time(NULL);
+    newtime.modtime = 0; // important. If this changes to anything else, we know that a write occured on
+                         // underlying filesystem. (if file was opened as R/W, that does not mean it actually changed
+                         // and that we need to execute DDL upon process closing it)
+    if (utime(*fname, &newtime) == -1) 
+        logmsg(LOG_ERROR, "qry_object() - unable to reset file modification time!");
 
 qry_object_cleanup:
 

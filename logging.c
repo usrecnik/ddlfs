@@ -70,8 +70,9 @@ void logddl(const char *msg, ...) {
     
     if (g_ddl_log_buf == NULL) {
         g_ddl_log_buf = calloc(DDL_LOG_SIZE, sizeof(char));
+        g_ddl_log_len = 0;
         if (g_ddl_log_buf == NULL) {
-            logmsg(LOG_ERROR, "Unable to allocate memory for in-memory contents of ddlfs.log, size=[%d]", DDL_LOG_SIZE);
+            logmsg(LOG_ERROR, "logddl() - Unable to allocate memory for in-memory contents of ddlfs.log, size=[%d]", DDL_LOG_SIZE);
             logmsg(LOG_ERROR, msg);
             return;
         }
@@ -80,16 +81,28 @@ void logddl(const char *msg, ...) {
     va_list args;
     va_start(args, msg);
 
-    if (DDL_LOG_SIZE - 250 < 0) {
-        logmsg(LOG_ERROR, "ABOUT TO REACH BUFFER OVERFLOW!");
+    // "realloc"
+    if (DDL_LOG_SIZE - g_ddl_log_len < 500) {
+        char *temp = calloc(DDL_LOG_SIZE, sizeof(char));
+        if (temp == NULL) {
+            logmsg(LOG_ERROR, "logddl() - Unable to re-allocate memory for in-memory contents of ddlfs.log, size=[%d]", DDL_LOG_SIZE);
+            logmsg(LOG_ERROR, msg);
+            return;
+        }
+        int half = DDL_LOG_SIZE / 2;
+        memcpy(temp, g_ddl_log_buf + half, g_ddl_log_len-half);
+        free(g_ddl_log_buf);
+        g_ddl_log_buf = temp;
     }
-
+    
     char *line = calloc(250, sizeof(char));
     vsnprintf(line, 249, msg, args);    
 
     strncat(g_ddl_log_buf, line, 250);
     strcat(g_ddl_log_buf, "\n");
-    
+
+    g_ddl_log_len = strlen(g_ddl_log_buf);
+    logmsg(LOG_DEBUG, "ddlfs.log len=[%d]", g_ddl_log_len);
     free(line);
     va_end(args);
 }

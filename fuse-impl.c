@@ -117,7 +117,7 @@ int fs_getattr( const char *path, struct stat *st )
         st->st_ctime = g_ddl_log_time;
         st->st_nlink = 1;
         st->st_mode = S_IFREG | 0444;
-        st->st_size = (g_ddl_log_buf == NULL ? 0 : strlen(g_ddl_log_buf));
+        st->st_size = (g_ddl_log_buf == NULL ? 0 : g_ddl_log_len);
         return 0;
     }
 
@@ -232,11 +232,12 @@ static int fake_open(const char *path,
 int fs_open(const char *path, 
 			struct fuse_file_info *fi) {
 
-	logmsg(LOG_INFO, "fuse-open: [%s]", path);
     if (strcmp(path, "/ddlfs.log") == 0) {
         fi->direct_io = 1;
         return 0;
     }
+    
+    logmsg(LOG_INFO, "fuse-open: [%s]", path);
     
 	int fh = fake_open(path, fi);
 	if (fh < 0) {
@@ -317,7 +318,6 @@ int fs_write(const char *path,
 int fs_release(const char *path, 
 			   struct fuse_file_info *fi) {
 	
-	logmsg(LOG_INFO, "fuse-release: [%s]", path);
 	int retval = 0;
 	char **part;
 	char *fname;
@@ -328,9 +328,12 @@ int fs_release(const char *path,
     if (strcmp(path, "/ddlfs.log") == 0)
         return 0;
 
+    logmsg(LOG_INFO, "fuse-release: [%s]", path);
+
     fs_path_create(&part, path);
 	qry_object_fname(
 		part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
+
 
 	// read file to buffer
 	if (fi->flags & O_RDWR || fi->flags & O_WRONLY) {
@@ -339,31 +342,34 @@ int fs_release(const char *path,
 			retval = -1;
 			goto fs_release_final;
 		}
-
-		logmsg(LOG_DEBUG, "(temp file size is %d bytes)", tmp_stat.st_size);
+        if (tmp_stat.st_mtime == 0) {
+            logmsg(LOG_DEBUG, "fs_release() - no write occured even though file was opened as r/w.");
+        } else {
+		    logmsg(LOG_DEBUG, "(temp file size is %d bytes)", tmp_stat.st_size);
 	
-		buf_len = (tmp_stat.st_size * sizeof(char)) + 1;
-		buf = malloc(buf_len);
-		if (buf == NULL) {
-			logmsg(LOG_ERROR, "fs_release() - unable to malloc buf (buf_len=[%d])", buf_len);
-			retval = -ENOMEM;
-			goto fs_release_final;
-		}
+		    buf_len = (tmp_stat.st_size * sizeof(char)) + 1;
+		    buf = malloc(buf_len);
+		    if (buf == NULL) {
+			    logmsg(LOG_ERROR, "fs_release() - unable to malloc buf (buf_len=[%d])", buf_len);
+			    retval = -ENOMEM;
+			    goto fs_release_final;
+		    }
 
-		logmsg(LOG_DEBUG, "Reading %d in buffer size %d, FD=%d", tmp_stat.st_size, buf_len, fi->fh);
-		size_t newLen = read(fi->fh, buf, tmp_stat.st_size);
-		if (newLen == -1 || newLen != tmp_stat.st_size) {
-			logmsg(LOG_ERROR, "fs_release() - unable to read() [%s], errno=%d (%s)", fname, errno, strerror(errno));
-			retval = -1;
-			goto fs_release_final;
-		}
-		logmsg(LOG_DEBUG, "Read %d bytes", newLen);
-		newLen++;
-		buf[newLen] = '\0';
+		    logmsg(LOG_DEBUG, "Reading %d in buffer size %d, FD=%d", tmp_stat.st_size, buf_len, fi->fh);
+		    size_t newLen = read(fi->fh, buf, tmp_stat.st_size);
+		    if (newLen == -1 || newLen != tmp_stat.st_size) {
+			    logmsg(LOG_ERROR, "fs_release() - unable to read() [%s], errno=%d (%s)", fname, errno, strerror(errno));
+			    retval = -1;
+			    goto fs_release_final;
+		    }
+		    logmsg(LOG_DEBUG, "Read %d bytes", newLen);
+		    newLen++;
+		    buf[newLen] = '\0';
 
-        qry_exec_ddl(buf);
+            qry_exec_ddl(buf);
         
-		logmsg(LOG_DEBUG, "Write Buffer [%s]", buf);
+		    logmsg(LOG_DEBUG, "Write Buffer [%s]", buf);
+        }
 	}
 
 	if (close(fi->fh) != 0) {
