@@ -560,7 +560,6 @@ int qry_exec_ddl(char *ddl) {
         logmsg(LOG_ERROR, "qry_exec_ddl() - unable to malloc ddl_msg");
         return EXIT_FAILURE;
     }
-
     // prepare log message (first 120 characters without newlines)
     strncpy(ddl_msg, ddl, 119);
     ddl_msg[119] = '\0';

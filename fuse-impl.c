@@ -324,6 +324,7 @@ int fs_release(const char *path,
 	struct stat tmp_stat; 
 	size_t buf_len = 0;
 	char *buf = NULL;
+    int fd = -1;
 
     if (strcmp(path, "/ddlfs.log") == 0)
         return 0;
@@ -334,11 +335,16 @@ int fs_release(const char *path,
 	qry_object_fname(
 		part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
 
+    if (close(fi->fh) != 0) {
+        // closing also flushes metadata, such as mtime
+        logmsg(LOG_DEBUG, "Unable to close underlying file (%s), error=%d", fname, errno);
+        return -errno;
+    }
 
 	// read file to buffer
 	if (fi->flags & O_RDWR || fi->flags & O_WRONLY) {
-		if (fstat(fi->fh, &tmp_stat) != 0) {
-			logmsg(LOG_ERROR, "fs_release() - fstat failed for [%s], fd=%d", fname, fi->fh);
+		if (stat(fname, &tmp_stat) != 0) {
+			logmsg(LOG_ERROR, "fs_release() - fstat failed for [%s]", fname);
 			retval = -1;
 			goto fs_release_final;
 		}
@@ -356,25 +362,24 @@ int fs_release(const char *path,
 		    }
 
 		    logmsg(LOG_DEBUG, "Reading %d in buffer size %d, FD=%d", tmp_stat.st_size, buf_len, fi->fh);
-		    size_t newLen = read(fi->fh, buf, tmp_stat.st_size);
+            fd = open(fname, O_RDONLY);
+            if (fd == -1) {
+                logmsg(LOG_ERROR, "fs_release() - unable to re-open temp file as r/o.");
+                retval = -1;
+                goto fs_release_final;
+            }
+		    size_t newLen = read(fd, buf, tmp_stat.st_size);
 		    if (newLen == -1 || newLen != tmp_stat.st_size) {
 			    logmsg(LOG_ERROR, "fs_release() - unable to read() [%s], errno=%d (%s)", fname, errno, strerror(errno));
 			    retval = -1;
 			    goto fs_release_final;
 		    }
 		    logmsg(LOG_DEBUG, "Read %d bytes", newLen);
-		    newLen++;
+		    // newLen++;
 		    buf[newLen] = '\0';
-
             qry_exec_ddl(buf);
-        
 		    logmsg(LOG_DEBUG, "Write Buffer [%s]", buf);
         }
-	}
-
-	if (close(fi->fh) != 0) {
-		logmsg(LOG_DEBUG, "Unable to close underlying file (%s), error=%d", fname, errno);
-		return -errno;
 	}
 
 	if (unlink(fname) != 0) {
@@ -384,6 +389,10 @@ int fs_release(const char *path,
 
 	
 fs_release_final:
+
+    if (fd != -1)
+        if (close(fd) == -1)
+            logmsg(LOG_ERROR, "fs_release() - unable to close underlying r/o file");
 
 	if (buf != NULL)
 		free (buf);
@@ -477,7 +486,22 @@ int fs_truncate(const char *path,
                 off_t size
                 /* struct fuse_file_info *fi - in newer fuse */) {
     logmsg(LOG_INFO, "fs_truncate() - [%s]", path);
-    // do nothing
+
+    char **part;
+    int depth = fs_path_create(&part, path);
+    char *fname;
+    
+    if (depth != DEPTH_MAX) {
+        logmsg(LOG_ERROR, "fs_truncate() - you can only truncate files in depth 3 (sql files)");
+        return -1;
+    }
+
+    qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
+    if (truncate(fname, 0) == -1) {
+        logmsg(LOG_ERROR, "fs_truncate() - unable to truncate [%s], errno=[%d]", fname, errno);
+        return -errno;
+    }
+ 
     return 0;
 }
 
