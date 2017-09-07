@@ -209,7 +209,7 @@ int qry_types(t_fsentry *schema) {
     
     char *types[] = {
         "function",
-        "java_class"
+        "java_class",
         "java_resource",
         "java_source",
         "package_body",
@@ -260,9 +260,23 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
     if (g_conf.lowercase) {
         str_upper(schema_name);
         str_upper(type_name);
-    }        
+    }
+    if (strcmp(type_name, "PACKAGE_SPEC") == 0) {
+        free(type_name);
+        type_name = strdup("PACKAGE");
+    } else if (strcmp(type_name, "PACKAGE_BODY") == 0) {
+        free(type_name);
+        type_name = strdup("PACKAGE BODY");
+    } else if (strcmp(type_name, "TYPE_BODY") == 0) {
+        free(type_name);
+        type_name = strdup("TYPE BODY");
+    }
+    if (type_name == NULL) {
+        logmsg(LOG_ERROR, "qry_objects() - Unable to reallocate type_name");
+        return EXIT_FAILURE;
+    }
     
-	struct tm *temptime = malloc(sizeof(struct tm)); // @todo - free me
+	struct tm *temptime = malloc(sizeof(struct tm)); 
 
 	vfs_entry_free(type, 1);
 

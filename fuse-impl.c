@@ -448,7 +448,13 @@ int fs_create (const char *path,
             snprintf(empty_ddl, 1023, "CREATE FUNCTION \"%s\".\"%s\" RETURN NUMBER AS\nBEGIN\n    RETURN NULL;\nEND;",
                 object_schema, object_name);    
         else if (strcmp(object_type, "VIEW") == 0)
-            snprintf(empty_ddl, 1023, "CREATE VIEW \"%s\".\"%s\" AS\nSELECT * FROM dual;",
+            snprintf(empty_ddl, 1023, "CREATE VIEW \"%s\".\"%s\" AS\nSELECT * FROM dual",
+                object_schema, object_name);
+        else if (strcmp(object_type, "TYPE") == 0)
+            snprintf(empty_ddl, 1023, "CREATE TYPE \"%s\".\"%s\" AS OBJECT(\nn NUMBER)",
+                object_schema, object_name);
+        else if (strcmp(object_type, "TYPE_BODY") == 0)
+            snprintf(empty_ddl, 1023, "CREATE TYPE BODY \"%s\".\"%s\" AS\n\nEND;",
                 object_schema, object_name);
         else if (strcmp(object_type, "PACKAGE_SPEC") == 0)
             snprintf(empty_ddl, 1023, "CREATE PACKAGE \"%s\".\"%s\" AS\n\nEND;",
@@ -541,6 +547,12 @@ int fs_unlink(const char *path) {
             object_schema, object_name);
     else if (strcmp(object_type, "VIEW") == 0)
         snprintf(drop_ddl, 1023, "DROP VIEW \"%s\".\"%s\"",
+            object_schema, object_name);
+    else if (strcmp(object_type, "TYPE") == 0)
+        snprintf(drop_ddl, 1023, "DROP TYPE \"%s\".\"%s\"",
+            object_schema, object_name);
+    else if (strcmp(object_type, "TYPE_BODY") == 0)
+        snprintf(drop_ddl, 1023, "DROP TYPE BODY \"%s\".\"%s\"",
             object_schema, object_name);
     else if (strcmp(object_type, "PACKAGE_SPEC") == 0)
         snprintf(drop_ddl, 1023, "DROP PACKAGE \"%s\".\"%s\"",
