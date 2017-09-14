@@ -5,7 +5,7 @@
 /**
  * Convert filename to correct case and optionally remove suffix (.sql)
  * */
-int str_fn2obj(char **dst, char *src, int removeSuffix);
+int str_fn2obj(char **dst, char *src, const char *expectedSuffix);
 
 /**
  * Populate g_vfs with list of schemas. Those are first-level folder entries.
@@ -42,5 +42,5 @@ int qry_object_fname(const char *schema,
 /**
  * Execute DDL statement.
  * */
-int qry_exec_ddl(char *ddl);
+int qry_exec_ddl(char *schema, char *object, char *ddl);
 

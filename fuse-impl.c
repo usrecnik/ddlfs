@@ -319,8 +319,10 @@ int fs_release(const char *path,
 			   struct fuse_file_info *fi) {
 	
 	int retval = 0;
-	char **part;
-	char *fname;
+	char **part = NULL;
+	char *fname = NULL;
+    char *object_name = NULL;
+    char *object_schema = NULL;
 	struct stat tmp_stat; 
 	size_t buf_len = 0;
 	char *buf = NULL;
@@ -377,7 +379,19 @@ int fs_release(const char *path,
 		    logmsg(LOG_DEBUG, "Read %d bytes", newLen);
 		    // newLen++;
 		    buf[newLen] = '\0';
-            qry_exec_ddl(buf);
+            
+            // determine object name/schema
+            if (str_fn2obj(&object_name, part[DEPTH_OBJECT], part[DEPTH_TYPE]) != EXIT_SUCCESS) {
+                logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+                return -ENOMEM;
+            }
+        
+            if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
+                logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
+                return -ENOMEM;
+            }
+        
+            qry_exec_ddl(object_schema, object_name, buf);
 		    logmsg(LOG_DEBUG, "Write Buffer [%s]", buf);
         }
 	}
@@ -395,7 +409,13 @@ fs_release_final:
             logmsg(LOG_ERROR, "fs_release() - unable to close underlying r/o file");
 
 	if (buf != NULL)
-		free (buf);
+		free(buf);
+
+    if (object_schema != NULL)
+        free(object_schema);
+
+    if (object_name != NULL)
+        free(object_name);
 
 	logmsg(LOG_DEBUG, "fs_release() returning: %d", retval);
 	return retval;
@@ -421,17 +441,17 @@ int fs_create (const char *path,
         
         depth = fs_path_create(&part, path);
 
-        if (str_fn2obj(&object_type, part[DEPTH_TYPE], 0) != EXIT_SUCCESS) {
+        if (str_fn2obj(&object_type, part[DEPTH_TYPE], NULL) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
             return -ENOMEM;
         }
 
-        if (str_fn2obj(&object_name, part[DEPTH_OBJECT], 1) != EXIT_SUCCESS) {
+        if (str_fn2obj(&object_name, part[DEPTH_OBJECT], part[DEPTH_TYPE]) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
             return -ENOMEM;
         }
         
-        if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 0) != EXIT_SUCCESS) {
+        if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
             return -ENOMEM;
         }
@@ -471,7 +491,7 @@ int fs_create (const char *path,
             return -EINVAL; // invalid argument 
         }
         
-        qry_exec_ddl(empty_ddl);
+        qry_exec_ddl(object_schema, object_name, empty_ddl);
 
         fs_path_free(part);
     }
@@ -526,15 +546,15 @@ int fs_unlink(const char *path) {
         logmsg(LOG_ERROR, "Cannot unlink objects which are not at level 3");
         return -EINVAL;
     }
-    if (str_fn2obj(&object_type, part[DEPTH_TYPE], 0) != EXIT_SUCCESS) {
+    if (str_fn2obj(&object_type, part[DEPTH_TYPE], NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
         return -ENOMEM;
     }
-    if (str_fn2obj(&object_name, part[DEPTH_OBJECT], 1) != EXIT_SUCCESS) {
+    if (str_fn2obj(&object_name, part[DEPTH_OBJECT], part[DEPTH_TYPE]) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
         return -ENOMEM;
     }
-    if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], 0) != EXIT_SUCCESS) {
+    if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
         return -ENOMEM;
     }
@@ -570,7 +590,7 @@ int fs_unlink(const char *path) {
     }
     fs_path_free(part);
     
-    qry_exec_ddl(drop_ddl);
+    qry_exec_ddl(object_schema, object_name, drop_ddl);
 
     if (object_type != NULL)
         free(object_type);

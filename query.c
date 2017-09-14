@@ -44,7 +44,7 @@ static int str_append(char **dst, char *src) {
 	return EXIT_SUCCESS;
 }
 
-int str_fn2obj(char **dst, char *src, int removeSuffix) {
+int str_fn2obj(char **dst, char *src, const char *objectType) {
     *dst = strdup(src);
     if (*dst == NULL) {
         logmsg(LOG_ERROR, "str_fn2obj() - Unable to malloc for dst string.");
@@ -52,28 +52,78 @@ int str_fn2obj(char **dst, char *src, int removeSuffix) {
     }
     if (g_conf.lowercase)
         str_upper(*dst);
+    logmsg(LOG_DEBUG, "urhdbg1");
     
-    if (removeSuffix) {
-        // safety check
-        char suffix[5];
-        int len = strlen(*dst);
-        for (int i = 0; i < 4; i++) {
-            int c = len-i-1;
-            if (c < 0)
-                suffix[i] = '\0';
-            else {
-                suffix[3-i] = (*dst)[c];
-            }
-        }
-        suffix[4] = '\0';
-        if (strcmp(suffix, ".SQL") != 0) {
-            logmsg(LOG_ERROR, "Expected .SQL suffix, got [%s] from [%s]", suffix, *dst);
+    if (objectType != NULL) {
+        char *_objectType = strdup(objectType);
+        if (_objectType == NULL) {
+            logmsg(LOG_DEBUG, "str_fn2obj() - unable to malloc object type");
             return EXIT_FAILURE;
         }
+        str_upper(_objectType);
+        logmsg(LOG_DEBUG, "urhgdbg2");
+        char *expectedSuffix = malloc(10 * sizeof(char));
+        if (expectedSuffix == NULL) {
+            logmsg(LOG_ERROR, "str_fn2obj() - unable to malloc expectedSuffix");
+            free(_objectType);
+            return EXIT_FAILURE;
+        }
+        logmsg(LOG_DEBUG, "urhdbg3");
+        if (strcmp(_objectType, "JAVA SOURCE") == 0)
+            strcpy(expectedSuffix, ".JAVA");
+        else if (strcmp(_objectType, "JAVA CLASS") == 0)
+            strcpy(expectedSuffix, ".CLASS");
+        else if (strcmp(_objectType, "JAVA RESOURCE") == 0)
+            strcpy(expectedSuffix, ".RES"); // might be anything really, like .properties, .xml, .ini, ...
+        else {
+            logmsg(LOG_DEBUG, "str_fn2obj() - defaulting to .SQL suffix for objectType=[%s]", _objectType);
+            strcpy(expectedSuffix, ".SQL");
+        }
+        logmsg(LOG_DEBUG, "urhdbg4");
+        char *actualSuffix = NULL;
+    
+        // safety check
+        int len = strlen(*dst);
+        int expectedLen = strlen(expectedSuffix);
+        if (expectedLen >= len) {
+            logmsg(LOG_ERROR, "Expected suffix [%s] is longer than original name [%s]", expectedSuffix, *dst);
+            free(_objectType);
+            free(expectedSuffix);
+            return EXIT_FAILURE;
+        }
+        
+        actualSuffix = calloc(expectedLen+1, sizeof(char));
+        if (actualSuffix == NULL) {
+            logmsg(LOG_ERROR, "str_fn2obj() - unable to malloc actualSuffix, size=[%d]", expectedLen);
+            return EXIT_FAILURE;
+        }
+        
+        for (int i = 0; i < expectedLen; i++) {
+            int c = len-i-1;
+            if (c < 0)
+                actualSuffix[i] = '\0';
+            else 
+                actualSuffix[expectedLen-1-i] = (*dst)[c];
+        }
+        actualSuffix[expectedLen] = '\0';
+        if (strcmp(expectedSuffix, actualSuffix) != 0) {
+            logmsg(LOG_ERROR, "Expected suffix was [%s], got [%s] from [%s]", expectedSuffix, actualSuffix, *dst);
+            free(actualSuffix);
+            logmsg(LOG_ERROR, "URH-DEBUG111");
+            free(_objectType);
+            logmsg(LOG_ERROR, "URH-DEBUG222");
+            free(expectedSuffix);
+            logmsg(LOG_DEBUG, "URH-DEBUG333");
+            return EXIT_FAILURE;
+        }
+        
         // remove '.sql' suffix
-        (*dst)[strlen(*dst)-4] = '\0';
+        (*dst)[strlen(*dst)-expectedLen] = '\0';
+        free(actualSuffix);
+        free(expectedSuffix);
+        free(_objectType);
     }
-
+    
     return 0;
 }
 
@@ -270,6 +320,12 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
     } else if (strcmp(type_name, "TYPE_BODY") == 0) {
         free(type_name);
         type_name = strdup("TYPE BODY");
+    } else if (strcmp(type_name, "JAVA_SOURCE") == 0) {
+        free(type_name);
+        type_name = strdup("JAVA SOURCE");
+    } else if (strcmp(type_name, "JAVA_CLASS") == 0) {
+        free(type_name);
+        type_name = strdup("JAVA CLASS");
     }
     if (type_name == NULL) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to reallocate type_name");
@@ -382,7 +438,7 @@ int qry_object(const char *schema,
 			   char **fname) {
 	
 	int retval = EXIT_SUCCESS;
-	char *query = 
+	const char *query = 
 "select dbms_metadata.get_ddl(\
 :bind_type, :bind_object, :bind_schema) \
 as retval from dual";
@@ -566,7 +622,64 @@ qry_object_cleanup:
 	return retval;
 }
 
-int qry_exec_ddl(char *ddl) {
+static int log_ddl_errors(const char *schema, const char *object) {
+    const char *query = "SELECT \"ATTRIBUTE\" || ', line ' || \"LINE\" || ', column ' || \"POSITION\" || ': ' || \"TEXT\" as msg \
+FROM all_errors \
+WHERE \"OWNER\"=:object_schema AND \"NAME\"=:object_name \
+ORDER BY \"SEQUENCE\"";
+
+    int retval = EXIT_SUCCESS;
+   	OCIStmt   *o_stm = NULL;
+	OCIDefine *o_def = NULL;
+    char      *o_sel = NULL;
+	OCIBind   *o_bnd[2] = {NULL, NULL};
+
+    if ((o_sel = malloc(5000*sizeof(char))) == NULL) {
+        logmsg(LOG_ERROR, "log_ddl_errors() - Unable to allocate memory for o_sel.");
+		return EXIT_FAILURE;
+    }
+    
+    if (ora_stmt_prepare(&o_stm, query)) {
+        retval = EXIT_FAILURE;
+        goto log_ddl_errors_cleanup;
+    }
+
+    if (ora_stmt_define(o_stm, &o_def, 1, (void*) o_sel, 5000*sizeof(char), SQLT_STR)) {
+	    retval = EXIT_FAILURE;
+        goto log_ddl_errors_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bnd[0], 1, (void*) schema, strlen(schema)+1, SQLT_STR)) {
+		retval = EXIT_FAILURE;
+        goto log_ddl_errors_cleanup;
+	}
+
+	if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) object, strlen(object)+1, SQLT_STR)) {
+		retval = EXIT_FAILURE;
+		goto log_ddl_errors_cleanup;
+	}
+
+	if (ora_stmt_execute(o_stm, 0)) {
+	    retval = EXIT_FAILURE;
+		goto log_ddl_errors_cleanup;
+	}
+    
+    while (ora_stmt_fetch(o_stm) == OCI_SUCCESS)
+        logddl(".. %s", o_sel);
+
+
+log_ddl_errors_cleanup:
+
+    if (o_stm != NULL)
+        ora_stmt_free(o_stm);
+
+    if (o_sel != NULL)
+        free(o_sel);
+
+    return retval;
+}
+
+int qry_exec_ddl(char *schema, char *object, char *ddl) {
     int retval = EXIT_SUCCESS;
     OCIStmt *stm = NULL;
     char *ddl_msg = malloc(120 * sizeof(char));
@@ -593,9 +706,50 @@ int qry_exec_ddl(char *ddl) {
 
     logmsg(LOG_DEBUG, "Executing DDL (%s)", ddl); // @todo - remove this debug messages
  
-    if (ora_stmt_execute(stm, 1)) {
+    int ddlret = ora_stmt_execute(stm, 1);
+    if (ddlret) {
+        char ociret[50];
         retval = EXIT_FAILURE;
-        logddl(".. FAILURE\n"); // @todo - get description from user_errors
+        switch (ddlret) {
+            case OCI_SUCCESS_WITH_INFO:
+                logmsg(LOG_DEBUG, "BEFORE SUCCESS_WITH_INFO");
+                strcpy(ociret, "OCI_SUCCESS_WITH_INFO");
+                logmsg(LOG_DEBUG, "AFTER_SUCCESS_WIH");
+                break;
+    
+            case OCI_NEED_DATA:
+                strcpy(ociret, "OCI_NEED_DATA");
+                break;
+
+            case OCI_NO_DATA:
+                strcpy(ociret, "OCI_NO_DATA");
+                break;
+
+            case OCI_ERROR:
+                strcpy(ociret, "OCI_ERROR");
+                break;
+            
+            case OCI_INVALID_HANDLE:
+                strcpy(ociret, "OCI_INVALID_HANDLE");
+                break;
+    
+            case OCI_STILL_EXECUTING:
+                strcpy(ociret, "OCI_STILL_EXECUTING");
+                break;
+    
+            case OCI_CONTINUE:
+                strcpy(ociret, "OCI_CONTINUE");
+                break;
+        
+            default:
+                strcpy(ociret, "OCI_UKNOWN");
+                break;
+        }
+        logddl(".. %s,", ociret);
+        if (log_ddl_errors(schema, object) != EXIT_SUCCESS)
+            logmsg(LOG_ERROR, "qry_exec_ddl() - Unable to log ddl errors to ddlfs.log");
+        logddl(" ");
+        
         goto qry_exec_ddl_cleanup;
     }
     logddl(".. SUCCESS\n");
