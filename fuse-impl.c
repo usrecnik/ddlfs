@@ -182,11 +182,8 @@ int fs_readdir(const char *path,
 
 	filler(buffer, ".", NULL, 0);
 	filler(buffer, "..", NULL, 0);
-	// logmsg(LOG_DEBUG, ".. number of items in directory [%s] is [%d]", entry->fname, entry->count);
-	for (int i = 0; i < entry->count; i++) {
-		// logmsg(LOG_DEBUG, ".. index=[%d], name=%s", i, entry->children[i]->fname);
+	for (int i = 0; i < entry->count; i++)
 		filler(buffer, entry->children[i]->fname, NULL, 0);
-	}
 	
 	fs_path_free(part);
     return 0;
@@ -203,21 +200,15 @@ static int fake_open(const char *path,
 		logmsg(LOG_ERROR, "Unable to open file at depth=%d (%s).", depth, path);
 		return -1;
 	}
-
 	char *fname;
 	if (qry_object(part[0], part[1], part[2], &fname) != EXIT_SUCCESS)
 		return -1;
-
-	logmsg(LOG_DEBUG, "fake open for real file of [%s]", fname);
-
+    
 	int fh;
-	if (fi != NULL) {
+	if (fi != NULL)
 		fh = open(fname, O_RDWR);
-		logmsg(LOG_DEBUG, "FAKE-OPEN opening as read/write");
-	} else {
-		logmsg(LOG_DEBUG, "FAKE-OPEN opening as read only");
+	else
 		fh = open(fname, O_RDONLY);
-	}
 
 	if (fh < 0) {
 		logmsg(LOG_ERROR, "Unable to open [%s] for passthrough (%d)", 
@@ -225,7 +216,6 @@ static int fake_open(const char *path,
 		return -1;
 	}
 	
-	logmsg(LOG_DEBUG, "fake_open returning handle %d", fh);
 	return fh;	
 }
 
@@ -251,7 +241,7 @@ int fs_open(const char *path,
 }
 
 static int fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    logmsg(LOG_DEBUG, "Reading ddlfs.log...");
+    //logmsg(LOG_DEBUG, "Reading ddlfs.log...");
 
     if (g_ddl_log_buf == NULL)
         return 0;
@@ -327,6 +317,7 @@ int fs_release(const char *path,
 	size_t buf_len = 0;
 	char *buf = NULL;
     int fd = -1;
+    int is_java_source = 0;
 
     if (strcmp(path, "/ddlfs.log") == 0)
         return 0;
@@ -336,6 +327,9 @@ int fs_release(const char *path,
     fs_path_create(&part, path);
 	qry_object_fname(
 		part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
+
+    if (strcmp(part[DEPTH_TYPE], "JAVA_SOURCE") == 0 || strcmp(part[DEPTH_TYPE], "java_source") == 0) 
+        is_java_source = 1;
 
     if (close(fi->fh) != 0) {
         // closing also flushes metadata, such as mtime
@@ -355,7 +349,7 @@ int fs_release(const char *path,
         } else {
 		    logmsg(LOG_DEBUG, "(temp file size is %d bytes)", tmp_stat.st_size);
 	
-		    buf_len = (tmp_stat.st_size * sizeof(char)) + 1;
+		    buf_len = ((tmp_stat.st_size + (is_java_source * 350)) * sizeof(char)) + 1;
 		    buf = malloc(buf_len);
 		    if (buf == NULL) {
 			    logmsg(LOG_ERROR, "fs_release() - unable to malloc buf (buf_len=[%d])", buf_len);
@@ -363,24 +357,7 @@ int fs_release(const char *path,
 			    goto fs_release_final;
 		    }
 
-		    logmsg(LOG_DEBUG, "Reading %d in buffer size %d, FD=%d", tmp_stat.st_size, buf_len, fi->fh);
-            fd = open(fname, O_RDONLY);
-            if (fd == -1) {
-                logmsg(LOG_ERROR, "fs_release() - unable to re-open temp file as r/o.");
-                retval = -1;
-                goto fs_release_final;
-            }
-		    size_t newLen = read(fd, buf, tmp_stat.st_size);
-		    if (newLen == -1 || newLen != tmp_stat.st_size) {
-			    logmsg(LOG_ERROR, "fs_release() - unable to read() [%s], errno=%d (%s)", fname, errno, strerror(errno));
-			    retval = -1;
-			    goto fs_release_final;
-		    }
-		    logmsg(LOG_DEBUG, "Read %d bytes", newLen);
-		    // newLen++;
-		    buf[newLen] = '\0';
-            
-            // determine object name/schema
+             // determine object name/schema
             if (str_fn2obj(&object_name, part[DEPTH_OBJECT], part[DEPTH_TYPE]) != EXIT_SUCCESS) {
                 logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
                 return -ENOMEM;
@@ -390,7 +367,30 @@ int fs_release(const char *path,
                 logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
                 return -ENOMEM;
             }
-        
+            
+		    logmsg(LOG_DEBUG, "Reading %d in buffer size %d, FD=%d", tmp_stat.st_size, buf_len, fi->fh);
+            fd = open(fname, O_RDONLY);
+            if (fd == -1) {
+                logmsg(LOG_ERROR, "fs_release() - unable to re-open temp file as r/o.");
+                retval = -1;
+                goto fs_release_final;
+            }            
+            buf[0] = '\0';
+            size_t newLenJava = 0;
+            if (is_java_source == 1)
+                newLenJava = sprintf(buf, "CREATE OR REPLACE AND COMPILE JAVA SOURCE NAMED \"%s\".\"%s\" AS\n",
+                    object_schema, object_name);
+            
+		    size_t newLen = read(fd, buf+strlen(buf), tmp_stat.st_size);
+		    if (newLen == -1 || newLen != tmp_stat.st_size) {
+			    logmsg(LOG_ERROR, "fs_release() - unable to read() [%s], errno=%d (%s) [%d]!=[%d]", fname, errno, strerror(errno), newLen, tmp_stat.st_size);
+			    retval = -1;
+			    goto fs_release_final;
+		    }
+		    logmsg(LOG_DEBUG, "Read %d bytes", newLen);
+		    // newLen++;
+		    buf[newLen+newLenJava] = '\0';
+            
             qry_exec_ddl(object_schema, object_name, buf);
 		    logmsg(LOG_DEBUG, "Write Buffer [%s]", buf);
         }
@@ -417,7 +417,6 @@ fs_release_final:
     if (object_name != NULL)
         free(object_name);
 
-	logmsg(LOG_DEBUG, "fs_release() returning: %d", retval);
 	return retval;
 }
 

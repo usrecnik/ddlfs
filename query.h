@@ -3,6 +3,16 @@
 #include "vfs.h"
 
 /**
+ * String utility and query functions.
+ * All functions returing an int return EXIT_SUCCESS on success and EXIT_FAILURE on failure.
+ * */
+
+/**
+ * Determine corrent suffix (such as .sql or .java) for specified objectType.
+ * */
+int str_suffix(char **dst, const char *objectType);
+
+/**
  * Convert filename to correct case and optionally remove suffix (.sql)
  * */
 int str_fn2obj(char **dst, char *src, const char *expectedSuffix);

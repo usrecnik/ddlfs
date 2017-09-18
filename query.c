@@ -14,7 +14,7 @@
 #include "oracle.h"
 #include "vfs.h"
 
-#define LOB_BUFFER_SIZE    8192
+#define LOB_BUFFER_SIZE 8192
 
 static void str_lower(char *str) {
     for (int i = 0; str[i]; i++)
@@ -44,6 +44,36 @@ static int str_append(char **dst, char *src) {
 	return EXIT_SUCCESS;
 }
 
+int str_suffix(char **dst, const char *objectType) {
+    char *suffix = calloc(10, sizeof(char));
+    char *type = strdup(objectType);
+    if (suffix == NULL || type == NULL) {
+        logmsg(LOG_ERROR, "str_suffix() - unable to malloc suffix and/or type."); 
+        if (suffix != NULL)
+            free(suffix);
+        if (type != NULL)
+            free(type);
+        return EXIT_FAILURE;
+    }
+    
+    str_upper(type);  
+     
+    if (strcmp(type, "JAVA_SOURCE") == 0)
+        strcpy(suffix, ".JAVA");
+    else if (strcmp(type, "JAVA_CLASS") == 0)
+        strcpy(suffix, ".CLASS");
+    else if (strcmp(type, "JAVA_RESOURCE") == 0)
+        strcpy(suffix, ".RES"); // might be anything really, like .properties, .xml, .ini, ...
+    else
+        strcpy(suffix, ".SQL");
+    
+    logmsg(LOG_DEBUG, "str_suffix() - returning suffix [%s] for type [%s]", suffix, type);
+
+    *dst = suffix;
+
+    return EXIT_SUCCESS;
+}
+
 int str_fn2obj(char **dst, char *src, const char *objectType) {
     *dst = strdup(src);
     if (*dst == NULL) {
@@ -52,42 +82,21 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
     }
     if (g_conf.lowercase)
         str_upper(*dst);
-    logmsg(LOG_DEBUG, "urhdbg1");
     
     if (objectType != NULL) {
-        char *_objectType = strdup(objectType);
-        if (_objectType == NULL) {
-            logmsg(LOG_DEBUG, "str_fn2obj() - unable to malloc object type");
-            return EXIT_FAILURE;
-        }
-        str_upper(_objectType);
-        logmsg(LOG_DEBUG, "urhgdbg2");
-        char *expectedSuffix = malloc(10 * sizeof(char));
-        if (expectedSuffix == NULL) {
-            logmsg(LOG_ERROR, "str_fn2obj() - unable to malloc expectedSuffix");
-            free(_objectType);
-            return EXIT_FAILURE;
-        }
-        logmsg(LOG_DEBUG, "urhdbg3");
-        if (strcmp(_objectType, "JAVA SOURCE") == 0)
-            strcpy(expectedSuffix, ".JAVA");
-        else if (strcmp(_objectType, "JAVA CLASS") == 0)
-            strcpy(expectedSuffix, ".CLASS");
-        else if (strcmp(_objectType, "JAVA RESOURCE") == 0)
-            strcpy(expectedSuffix, ".RES"); // might be anything really, like .properties, .xml, .ini, ...
-        else {
-            logmsg(LOG_DEBUG, "str_fn2obj() - defaulting to .SQL suffix for objectType=[%s]", _objectType);
-            strcpy(expectedSuffix, ".SQL");
-        }
-        logmsg(LOG_DEBUG, "urhdbg4");
+        char *expectedSuffix = NULL;       
         char *actualSuffix = NULL;
+        
+        if (str_suffix(&expectedSuffix, objectType) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "Unable to obtain suffix for object type [%s].", objectType);
+            return EXIT_FAILURE;
+        }
     
         // safety check
         int len = strlen(*dst);
         int expectedLen = strlen(expectedSuffix);
         if (expectedLen >= len) {
             logmsg(LOG_ERROR, "Expected suffix [%s] is longer than original name [%s]", expectedSuffix, *dst);
-            free(_objectType);
             free(expectedSuffix);
             return EXIT_FAILURE;
         }
@@ -109,19 +118,15 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
         if (strcmp(expectedSuffix, actualSuffix) != 0) {
             logmsg(LOG_ERROR, "Expected suffix was [%s], got [%s] from [%s]", expectedSuffix, actualSuffix, *dst);
             free(actualSuffix);
-            logmsg(LOG_ERROR, "URH-DEBUG111");
-            free(_objectType);
-            logmsg(LOG_ERROR, "URH-DEBUG222");
             free(expectedSuffix);
-            logmsg(LOG_DEBUG, "URH-DEBUG333");
             return EXIT_FAILURE;
         }
         
-        // remove '.sql' suffix
+        // actually remove '.sql' suffix:
         (*dst)[strlen(*dst)-expectedLen] = '\0';
+
         free(actualSuffix);
         free(expectedSuffix);
-        free(_objectType);
     }
     
     return 0;
@@ -259,8 +264,6 @@ int qry_types(t_fsentry *schema) {
     
     char *types[] = {
         "function",
-        "java_class",
-        "java_resource",
         "java_source",
         "package_body",
         "package_spec",
@@ -303,14 +306,32 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
 
     char *schema_name = strdup(schema->fname);
     char *type_name = strdup(type->fname);
+    char *suffix = NULL;
     if (type_name == NULL || schema_name == NULL) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to strdup type_name and/or schema_name");
+        if (type_name != NULL)
+            free(type_name);
+        if (schema_name != NULL)
+            free(schema_name);
         return EXIT_FAILURE;
     }
     if (g_conf.lowercase) {
         str_upper(schema_name);
         str_upper(type_name);
     }
+
+    if (str_suffix(&suffix, type_name) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_objects() - Unable to obtain suffix for object type [%s]", type_name);
+        if (type_name != NULL)
+            free(type_name);
+        if (schema_name != NULL)
+            free(schema_name);
+        return EXIT_FAILURE;
+    }
+
+    if (g_conf.lowercase)
+        str_lower(suffix);
+
     if (strcmp(type_name, "PACKAGE_SPEC") == 0) {
         free(type_name);
         type_name = strdup("PACKAGE");
@@ -371,7 +392,9 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
 	    retval = EXIT_FAILURE;
 		goto qry_objects_cleanup;
 	}
-	
+
+    	
+
 	while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
 	    
 		memset(temptime, 0, sizeof(struct tm));
@@ -383,10 +406,15 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
 		}
 
 		time_t t_modified = timegm(temptime);
-		char *fname = malloc((strlen((char*)o_sel[0])+4)*sizeof(char));
+		/*
+        char *fname = malloc((strlen((char*)o_sel[0])+4)*sizeof(char));
         strcpy(fname, (char*) o_sel[0]);
         strcat(fname, ".SQL");
-
+        */
+        char *fname = malloc((strlen((char*)o_sel[0])+strlen(suffix))*sizeof(char));
+        strcpy(fname, (char*) o_sel[0]);
+        strcat(fname, suffix);
+         
         if (g_conf.lowercase)
             str_lower(fname);
         
@@ -397,7 +425,6 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
        
         free(fname);
 		vfs_entry_add(type, entry);	
-        logmsg(LOG_DEBUG, ".. OBJECT [%s]", entry->fname);
 	}
 
 qry_objects_cleanup:
@@ -407,6 +434,9 @@ qry_objects_cleanup:
 
 	if (temptime != NULL)
 		free(temptime);
+
+    if (suffix != NULL)
+        free(suffix);
 	
 	if (o_stm != NULL)
 		ora_check(OCIHandleFree(o_stm, OCI_HTYPE_STMT));
@@ -445,7 +475,8 @@ as retval from dual";
 
     char *object_schema = NULL; // those three variables represent object in correct case 
     char *object_type = NULL;   // according to g_conf.lowercase;
-    char *object_name = NULL;   // object_name is also stripped of ".sql" suffix
+    char *object_name = NULL;   // object_name is also stripped of ".sql" (or ".java" or whatever) suffix
+    char *suffix = NULL;
 
 	OCILobLocator *o_lob = NULL; // free
 	OCIStmt 	  *o_stm = NULL; // free
@@ -458,6 +489,8 @@ as retval from dual";
 	oraub8 buf_blen = LOB_BUFFER_SIZE;
 	oraub8 buf_clen = 0;
 	int lob_offset = 1;
+    
+    int is_java_source = 0;
 
 	FILE *fp = NULL; // free
 	*fname = malloc(PATH_MAX * sizeof(char));
@@ -472,7 +505,6 @@ as retval from dual";
         logmsg(LOG_ERROR, "qry_object() - unable to determine filename, qry_object_fname() failed.");
         return EXIT_FAILURE;
     }
-	logmsg(LOG_DEBUG, "Filename=[%s].", *fname);
 
     // convert names in correct case if necessary and strip ".sql" suffix from the name
     object_schema = strdup(schema);
@@ -480,21 +512,30 @@ as retval from dual";
     object_name = strdup(object);
     if (object_name == NULL || object_type == NULL || object_name == NULL) {
         logmsg(LOG_DEBUG, "Unable to malloc object_schema, object_type and/or object_name.");
-        return EXIT_FAILURE;
+        retval = EXIT_FAILURE;
+        goto qry_object_cleanup;
     }
-    object_name[strlen(object)-4] = '\0';
     if (g_conf.lowercase) {
         str_upper(object_schema);
         str_upper(object_type);
         str_upper(object_name);
     }
-
-    logmsg(LOG_DEBUG, "**** DEBUG, object_name=[%s].[%s] - [%s]", object_schema, object_name, object_type);
+    if (strcmp(object_type, "JAVA_SOURCE") == 0)
+        is_java_source = 1;
+    else
+        is_java_source = 0;
     
+    if (str_suffix(&suffix, object_type) != EXIT_SUCCESS) {
+        logmsg(LOG_DEBUG, "qry_object() - Unable to determine suffix for object type [%s]", object_type);        
+        retval = EXIT_FAILURE;
+        goto qry_object_cleanup;
+    }
+    object_name[strlen(object)-strlen(suffix)] = '\0';
     
 	if (buf == NULL) {
 		logmsg(LOG_ERROR, "Unable to malloc lob buffer (size=%d).", LOB_BUFFER_SIZE);
-		return EXIT_FAILURE;
+        retval = EXIT_FAILURE;
+        goto qry_object_cleanup;
 	}
 	
 	if (ora_lob_alloc(&o_lob)) {
@@ -563,11 +604,21 @@ as retval from dual";
 		lob_offset += buf_blen;
 
 		if (first) {
-			// trim leading spaces and newlines. I'm not sure why dbms_metdata
-			// writes them anyway as they are totaly useless.
-			for (first_offset = 0; first_offset < buf_blen; first_offset++)
-				if (buf[first_offset] != ' ' && buf[first_offset] != '\n')
-					break;	
+    		// remove "create java source" from first line
+            first_offset = 0;
+            if (is_java_source == 1) {
+                first_offset = 1; // because first character is always '\n'
+                for (; first_offset < buf_blen; first_offset++)
+                    if (buf[first_offset] == '\n' || buf[first_offset] == '\r')
+                        break;
+            }
+            
+            // trim leading spaces and newlines. I'm not sure why dbms_metdata
+	    	// writes them anyway as they are totaly useless.
+		    for (; first_offset < buf_blen; first_offset++) 
+                if (buf[first_offset] != ' ' && buf[first_offset] != '\n' && buf[first_offset] != '\r')
+                    break;            
+            
 			bytes_written = fwrite(buf + first_offset, 1, buf_blen - first_offset, fp);
 			buf_blen -= first_offset;
 		} else { 
@@ -606,6 +657,9 @@ qry_object_cleanup:
 
     if (object_name != NULL)
         free(object_name);
+
+    if (suffix != NULL)
+        free(suffix);
     
 	if (buf != NULL)
 		free(buf);

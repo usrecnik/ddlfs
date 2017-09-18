@@ -102,7 +102,7 @@ void logddl(const char *msg, ...) {
     strcat(g_ddl_log_buf, "\n");
 
     g_ddl_log_len = strlen(g_ddl_log_buf);
-    logmsg(LOG_DEBUG, "ddlfs.log len=[%d]", g_ddl_log_len);
+    //logmsg(LOG_DEBUG, "ddlfs.log len=[%d]", g_ddl_log_len);
     free(line);
     va_end(args);
 }
