@@ -8,11 +8,11 @@
 
 sword ora_check(sword status) {
     text errbuf[512];
-      sb4 errcode;
+    sb4 errcode;
 
-      switch (status) {
-          case OCI_SUCCESS:
-                break;
+    switch (status) {
+        case OCI_SUCCESS:
+            break;
   
         case OCI_SUCCESS_WITH_INFO:
             logmsg(LOG_ERROR, "OCI_SUCCESS_WITH_INFO");
@@ -22,31 +22,31 @@ sword ora_check(sword status) {
             logmsg(LOG_ERROR, "OCI_NEED_DATA");
             break;
 
-          case OCI_NO_DATA:
+        case OCI_NO_DATA:
             logmsg(LOG_ERROR, "OCI_NO_DATA");
             break;
 
-          case OCI_ERROR:
+        case OCI_ERROR:
             OCIErrorGet(
                 g_connection.err, (ub4) 1, (text *) NULL, &errcode, errbuf, 
                 (ub4) sizeof(errbuf), (ub4) OCI_HTYPE_ERROR);
             logmsg(LOG_ERROR, "errcode=%d||%s", errcode, (char *)errbuf);
             break;
 
-          case OCI_INVALID_HANDLE:
+        case OCI_INVALID_HANDLE:
             logmsg(LOG_ERROR, "OCI_INVALID_HANDLE");
             break;
 
-          case OCI_STILL_EXECUTING:
+        case OCI_STILL_EXECUTING:
             logmsg(LOG_ERROR, "OCI_STILL_EXECUTING");
             break;
 
-          case OCI_CONTINUE:
+        case OCI_CONTINUE:
             logmsg(LOG_ERROR, "CI_CONTINUE");
             break;
     
-          default:
-               break;
+        default:
+            break;
     }
     return status;
 }
@@ -63,9 +63,9 @@ int ora_connect(char* username, char* password, char* database) {
 
     logmsg(LOG_DEBUG, ".. allocating handles.");
     OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.err, OCI_HTYPE_ERROR,   0, 0);
-      OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.srv, OCI_HTYPE_SERVER,  0, 0);
-      OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.svc, OCI_HTYPE_SVCCTX,  0, 0);
-      OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.ses, OCI_HTYPE_SESSION, 0, 0);
+    OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.srv, OCI_HTYPE_SERVER,  0, 0);
+    OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.svc, OCI_HTYPE_SVCCTX,  0, 0);
+    OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.ses, OCI_HTYPE_SESSION, 0, 0);
         
     logmsg(LOG_DEBUG, ".. attaching to server process.");
     r = OCIServerAttach(
@@ -80,11 +80,11 @@ int ora_connect(char* username, char* password, char* database) {
     
     logmsg(LOG_DEBUG, ".. setting session attributes (user=%s).", username);
     OCIAttrSet(g_connection.svc, OCI_HTYPE_SVCCTX, g_connection.srv, 0, OCI_ATTR_SERVER, g_connection.err);
-      OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, username, strlen(username), OCI_ATTR_USERNAME, g_connection.err); 
-      OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, password, strlen(password), OCI_ATTR_PASSWORD, g_connection.err);
+    OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, username, strlen(username), OCI_ATTR_USERNAME, g_connection.err); 
+    OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, password, strlen(password), OCI_ATTR_PASSWORD, g_connection.err);
 
     logmsg(LOG_DEBUG, ".. starting database session.");
-      r = OCISessionBegin (
+    r = OCISessionBegin (
         g_connection.svc, 
         g_connection.err, 
         g_connection.ses,
@@ -151,7 +151,7 @@ sword ora_stmt_bind(OCIStmt *stm, OCIBind **bnd, ub4 pos, void *value, sb4 value
 sword ora_stmt_execute(OCIStmt *stm, ub4 iters) {
     sword r = OCIStmtExecute(
         g_connection.svc, stm, g_connection.err, iters,
-         0, 0, 0, OCI_DEFAULT);
+        0, 0, 0, OCI_DEFAULT);
     ora_check(r);
     return r;
 }
@@ -183,6 +183,4 @@ sword ora_lob_free(OCILobLocator *lob)  {
     ora_check(r);
     return r;
 }
-
-
 

@@ -172,7 +172,7 @@ int qry_schemas() {
     int pos_in, pos_like;
     OCIStmt   *o_stm = NULL;
     OCIDefine *o_def = NULL;
-    char       *o_sel = malloc(256 * sizeof(char));
+    char      *o_sel = malloc(256 * sizeof(char));
     OCIBind   *o_bnd[200];
     int        o_bnd_idx = 0;
     char tmp[50]; // for converting int to char*
@@ -494,7 +494,7 @@ as retval from dual";
 
     OCILobLocator *o_lob = NULL; // free
     OCIStmt       *o_stm = NULL; // free
-    OCIDefine       *o_def = NULL; // i *assume* following for OCIDefine as well:
+    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
     OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when 
     OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
     OCIBind       *o_bn3 = NULL;
@@ -640,7 +640,7 @@ where \"TYPE\"=:bind_type and \"NAME\"=:bind_object and \"OWNER\"=:bind_schema \
 order by \"LINE\"";
      
     OCIStmt       *o_stm = NULL; // free
-    OCIDefine       *o_def = NULL; // i *assume* following for OCIDefine as well:
+    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
     char          *o_sel = NULL;
     OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when 
     OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
@@ -707,11 +707,6 @@ order by \"LINE\"";
             type_spaces++;
 
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
-        if (o_sel == NULL) {
-            logmsg(LOG_DEBUG, "O_SEL IS NULL ****************************");
-            continue;
-        }
-        
         if (!is_java_source && first) {
             // replace multiple spaces with single space
             org = o_sel;
@@ -862,7 +857,7 @@ WHERE \"OWNER\"=:object_schema AND \"NAME\"=:object_name \
 ORDER BY \"SEQUENCE\"";
 
     int retval = EXIT_SUCCESS;
-       OCIStmt   *o_stm = NULL;
+    OCIStmt   *o_stm = NULL;
     OCIDefine *o_def = NULL;
     char      *o_sel = NULL;
     OCIBind   *o_bnd[2] = {NULL, NULL};
@@ -995,3 +990,4 @@ qry_exec_ddl_cleanup:
 
     return retval;
 }
+

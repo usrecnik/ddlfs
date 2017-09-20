@@ -159,7 +159,7 @@ int fs_getattr( const char *path, struct stat *st )
                 st->st_uid, st->st_gid, st->st_atime, st->st_mtime, st->st_ctime, st->st_nlink, st->st_mode, st->st_size);
         }
     }
-    return 0;
+    retu0rn 0;
 }
 
 int fs_readdir(const char *path, 
@@ -241,8 +241,6 @@ int fs_open(const char *path,
 }
 
 static int fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    //logmsg(LOG_DEBUG, "Reading ddlfs.log...");
-
     if (g_ddl_log_buf == NULL)
         return 0;
 

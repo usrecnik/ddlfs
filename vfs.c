@@ -5,9 +5,9 @@
 #include "logging.h"
 
 t_fsentry* vfs_entry_create(const char type, 
-                                  const char *fname, 
-                               time_t created, 
-                                 time_t modified) {
+                            const char *fname, 
+                            time_t created, 
+                            time_t modified) {
 
     t_fsentry *t = malloc(sizeof(t_fsentry));
     t->ftype = type;
@@ -18,7 +18,6 @@ t_fsentry* vfs_entry_create(const char type,
     if (type == 'D') {
         t->capacity = 100;
         t->children = malloc(sizeof(t_fsentry*) * t->capacity);
-        
         if (t->children == NULL)
             logmsg(LOG_ERROR, "Unable to malloc children for %s", t->fname);
     } else {
@@ -35,12 +34,8 @@ void vfs_entry_free(t_fsentry *entry, int children_only) {
     
     entry->count = 0;
     if (!children_only) {
-        if (entry->children != NULL) {
-            //logmsg(LOG_DEBUG, "*** FREE CHILDREN ARR OF (%s, %d, %d, %d)", entry->fname, entry->capacity, entry->allocated,
-            //    entry->count);
+        if (entry->children != NULL)
             free(entry->children);
-        }
-        
         free(entry->fname);
         free(entry);
         entry->allocated = 0;
@@ -76,21 +71,16 @@ t_fsentry* _vfs_search(t_fsentry *entry, const char *fname, int min, int max, in
         return NULL; // no entries
     
     int pos = (min == max ? min : min + (max-min)/2);
-    //logmsg(LOG_DEBUG, "Min=[%d], Max=[%d], Pos=[%d], Depth=[%d], value=[%s]", min, max, pos, depth,
-    //    entry->children[pos]->fname);
     if (depth > 10)
         return NULL;
     
     int cmp = strcmp(entry->children[pos]->fname, fname);
-    if (cmp == 0) {
-    //    logmsg(LOG_DEBUG, ".. found!");
+    if (cmp == 0)
         return entry->children[pos];
-    }
-    if (min == max) {
-    //    logmsg(LOG_DEBUG, ".. returning NULL");
+    
+    if (min == max)
         return NULL;
-    }
-
+    
     if (cmp < 0)
         return _vfs_search(entry, fname, pos, max, depth+1);
     else

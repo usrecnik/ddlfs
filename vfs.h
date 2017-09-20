@@ -5,14 +5,16 @@
 typedef struct s_fsentry {
     char    ftype;
     char    *fname; 
-    time_t created;  
-    time_t modified;
-    struct s_fsentry **children;
+    time_t  created;  
+    time_t  modified;
+    struct  s_fsentry **children;
 	int 	capacity;
 	int 	count;
 	int     allocated; // for debugging
-} t_fsentry;                                                                                                 
+} t_fsentry;
+                                                                                                 
 t_fsentry *g_vfs;
+
 
 
 t_fsentry* vfs_entry_create(const char type, 

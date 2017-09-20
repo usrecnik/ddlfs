@@ -22,8 +22,8 @@ static struct fuse_opt ddlfs_opts[] = {
     MYFS_OPT("lowercase",   lowercase, 1),
     MYFS_OPT("nolowercase", lowercase, 0),
         
-    FUSE_OPT_KEY("-h",             KEY_HELP),
-    FUSE_OPT_KEY("--help",         KEY_HELP),
+    FUSE_OPT_KEY("-h",      KEY_HELP),
+    FUSE_OPT_KEY("--help",  KEY_HELP),
     FUSE_OPT_END
 };
 
