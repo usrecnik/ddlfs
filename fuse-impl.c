@@ -159,7 +159,7 @@ int fs_getattr( const char *path, struct stat *st )
                 st->st_uid, st->st_gid, st->st_atime, st->st_mtime, st->st_ctime, st->st_nlink, st->st_mode, st->st_size);
         }
     }
-    retu0rn 0;
+    return 0;
 }
 
 int fs_readdir(const char *path, 
