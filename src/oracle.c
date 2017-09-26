@@ -56,10 +56,8 @@ int ora_connect(char* username, char* password, char* database) {
     
     logmsg(LOG_INFO, "Connecting to Oracle Database (%s).", database);
     r = OCIEnvCreate(&g_connection.env, OCI_DEFAULT, 0, 0, 0, 0, 0, 0);
-      if (r != OCI_SUCCESS)  {
-        logmsg(LOG_ERROR, "OCIEnvCreate() failed!");
-        return 1;
-      } 
+    if (ora_check(r) != OCI_SUCCESS)
+        return EXIT_FAILURE;
 
     logmsg(LOG_DEBUG, ".. allocating handles.");
     OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.err, OCI_HTYPE_ERROR,   0, 0);
@@ -76,7 +74,7 @@ int ora_connect(char* username, char* password, char* database) {
         (ub4) OCI_DEFAULT);
 
     if (ora_check(r))
-          return r;
+        return EXIT_FAILURE;
     
     logmsg(LOG_DEBUG, ".. setting session attributes (user=%s).", username);
     OCIAttrSet(g_connection.svc, OCI_HTYPE_SVCCTX, g_connection.srv, 0, OCI_ATTR_SERVER, g_connection.err);
@@ -90,13 +88,13 @@ int ora_connect(char* username, char* password, char* database) {
         g_connection.ses,
         OCI_CRED_RDBMS, OCI_DEFAULT);
     if (ora_check(r))
-        return r;
+        return EXIT_FAILURE;
 
     logmsg(LOG_DEBUG, ".. registering database session.");
     OCIAttrSet(g_connection.svc, OCI_HTYPE_SVCCTX, g_connection.ses, 0, OCI_ATTR_SESSION, g_connection.err);
 
     logmsg(LOG_INFO, ".. connected.");
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 

@@ -1,4 +1,4 @@
-.TH ddlfs 5
+.TH ddlfs 1
 
 .SH NAME
 ddlfs \- Represent Oracle Database objects as their DDL stored in .sql files.

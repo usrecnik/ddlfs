@@ -53,10 +53,10 @@ int main(int argc, char *argv[]) {
         .unlink   = fs_unlink
     };
     
-    ora_connect(
-        g_conf.username, 
-        g_conf.password, 
-        g_conf.database);
+    if (ora_connect(g_conf.username, g_conf.password, g_conf.database) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "Unable to connect to database.");
+        return EXIT_SUCCESS;
+    }
 
     g_vfs = vfs_entry_create('D', "/", time(NULL), time(NULL));    
     

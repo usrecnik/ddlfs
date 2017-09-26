@@ -19,15 +19,16 @@ all:
 
 release: all
 	@mkdir -p ../target/${PKG_FULL_NAME}/DEBIAN
-	@mkdir -p ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
+	@mkdir -p ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/
 	@mkdir -p ../target/${PKG_FULL_NAME}/usr/bin
-	@cp ../target/ddlfs ../target/${PKG_FULL_NAME}/usr/bin/
-	@cp ${LD_LIBRARY_PATH}/libclntsh.so.12.1     ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
-	@cp ${LD_LIBRARY_PATH}/libclntshcore.so.12.1 ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
-	@cp ${LD_LIBRARY_PATH}/libmql1.so            ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
-	@cp ${LD_LIBRARY_PATH}/libipc1.so            ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
-	@cp ${LD_LIBRARY_PATH}/libnnz12.so           ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
-	@cp ${LD_LIBRARY_PATH}/libons.so             ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
+	@mkdir -p ../target/${PKG_FULL_NAME}/usr/share/man/man1
+	@cp wrapper.sh ../target/${PKG_FULL_NAME}/usr/bin/ddlfs
+	@cp ../target/ddlfs ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ddlfs
+	@chmod a+x ../target/${PKG_FULL_NAME}/usr/bin/ddlfs
+	@chmod a+x ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ddlfs
+	@cp ../docs/ddlfs.man ../target/${PKG_FULL_NAME}/usr/share/man/man1/ddlfs.1
+	@unzip ../../instantclient_12_2/instantclient-basic-linux.x64-12.2.0.1.0.zip -d ../target/${PKG_FULL_NAME}/usr/lib/ddlfs
+	@mv -v ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/instantclient_12_2 ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
 	@echo "Package: ${PKG_NAME}"       > ${DEB_CF}
 	@echo "Version: ${PKG_VERS}"      >> ${DEB_CF}
 	@echo "Architecture: ${PKG_ARCH}" >> ${DEB_CF}
@@ -35,6 +36,7 @@ release: all
 	@echo "Depends: fuse"             >> ${DEB_CF}
 	@echo "Description: ${PKG_DESC}"  >> ${DEB_CF}
 	@echo ' n/a'                      >> ${DEB_CF} # extended description
+	@chown -R root:root ../target/*
 	@dpkg-deb -b ../target/${PKG_FULL_NAME}
 	@alien --to-rpm ../target/${PKG_FULL_NAME}.deb
 	@mv *.rpm ../target/${PKG_FULL_NAME}.rpm
