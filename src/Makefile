@@ -33,7 +33,7 @@ release: all
 	@echo "Version: ${PKG_VERS}"      >> ${DEB_CF}
 	@echo "Architecture: ${PKG_ARCH}" >> ${DEB_CF}
 	@echo "Maintainer: ${PKG_MAIN}"   >> ${DEB_CF}
-	@echo "Depends: fuse"             >> ${DEB_CF}
+	@echo "Depends: fuse, libaio1"    >> ${DEB_CF}
 	@echo "Description: ${PKG_DESC}"  >> ${DEB_CF}
 	@echo ' n/a'                      >> ${DEB_CF} # extended description
 	@chown -R root:root ../target/*
