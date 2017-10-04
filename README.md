@@ -7,7 +7,7 @@ Installation
 `apt install ./ddlfs-<ver>.deb`  
 `yum localinstall --nogpgcheck ddlfs-<ver>.rpm`
 
-`.rpm` and `.deb' packages were tested on:
+`.rpm` and `.deb` packages were tested on:
 
 * Ubuntu versions 16.4 and 17.4
 * Oracle Enterprise Linux 6.0 and 7.4
@@ -17,8 +17,8 @@ Older/other versions might need to compile from source (due to different libc an
 
 Usage
 -----
-`mount -t fuse -o username=<username>,password=<password>,database=<host>:<port>/<service> ddlfs <mountpoint>`
-or
+`mount -t fuse -o username=<username>,password=<password>,database=<host>:<port>/<service> ddlfs <mountpoint>`  
+or  
 `ddlfs -o username=<username>,password=<password>,database=<host>:<port>/<service> <mountpoint>`
 
 In the latter, you can optionally use `-f` flag to run filesystem in foreground (especially useful with `loglevel=DEBUG` :-) )
