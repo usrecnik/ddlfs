@@ -1,13 +1,13 @@
+__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <time.h>
 
-
 #include "logging.h"
 #include "config.h"
-
 
 static void get_datestr(char* datestr, unsigned long bufsize) {
     time_t now = time(NULL);

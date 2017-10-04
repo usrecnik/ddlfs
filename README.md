@@ -7,10 +7,10 @@ Installation
 `apt install ./ddlfs-<ver>.deb`  
 `yum localinstall --nogpgcheck ddlfs-<ver>.rpm`
 
-Packages were tested on:
+`.rpm` and `.deb' packages were tested on:
 
 * Ubuntu versions 16.4 and 17.4
-* Oracle Enterprise Linux 7.4
+* Oracle Enterprise Linux 6.0 and 7.4
 
 Older/other versions might need to compile from source (due to different libc and fuse versions).
 

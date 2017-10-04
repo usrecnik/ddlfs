@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
 
+__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+
 #include <fuse.h>
 #include <fcntl.h>
 #include <sys/stat.h>

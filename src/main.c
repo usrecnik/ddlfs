@@ -18,7 +18,6 @@
 #include "query.h"
 #include "vfs.h"
 
-
 int main(int argc, char *argv[]) {
     memset(&g_conf, 0, sizeof(g_conf));
     g_conf.loglevel = "DEBUG";
