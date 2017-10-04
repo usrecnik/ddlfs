@@ -74,8 +74,10 @@ static void qry_any(int depth, t_fsentry* schema, t_fsentry *type) {
 
 // return NULL if file not found
 static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
-    if (path[0] == NULL) 
+    if (path[0] == NULL) {
+        qry_any(0, NULL, NULL);
         return g_vfs;
+    }
 
     t_fsentry *entries[DEPTH_MAX] = {NULL, NULL, NULL};
     for (int i = 0; i < DEPTH_MAX; i++) {
