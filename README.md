@@ -23,6 +23,35 @@ or
 
 In the latter, you can optionally use `-f` flag to run filesystem in foreground (especially useful with `loglevel=DEBUG` :-) )
 
+When mounted, following directory tree is available under mountpoint:
+ 
+ * `<schema>`
+ ** function
+ ** java_source
+ ** package_body
+ ** package_spec
+ ** procedure
+ ** type 
+ ** type_body
+ ** view
+
+Each folder has `.sql` file for each object of specified type (parent folder) in database. For example, folder `<schema>/view/`
+has list one `.sql` file for every view in this schema.
+
+If you write to those files, filesystem will execute DDL stored in the file on file close (thus, you can edit database objects
+via this filesystem). Filesystem keeps a local copy on regular filesystem while the file is open (between open and close calls).
+
+If you delete such .sql file, a `DROP <object_type> <object_name>` is issued.
+
+If you create new file (e.g. using `touch` utility), a new object is created from template - e.g. for views, it is 
+`create view "<schema>"."object_name" as select * from dual".
+
+All files have last modified date set to `last_ddl_time` from `all_objects` view. All files report file size 0, except for
+those that are currently open - those report their actual file size.
+
+One special file exists, `ddlfs.log`, which contains log of every executed DDL operation along with possible errors and 
+warnings (e.g. indicating on which line syntax error occured).
+
 
 Mount Options
 -------------
