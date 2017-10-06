@@ -36,7 +36,7 @@ When mounted, following directory tree is available under mountpoint:
   * `view`
 
 Each folder has `.sql` file for each object of specified type (parent folder) in database. For example, folder `<schema>/view/`
-has list one `.sql` file for every view in this schema.
+has one `.sql` file for every view in this schema.
 
 If you write to those files, filesystem will execute DDL stored in the file on file close (thus, you can edit database objects
 via this filesystem). Filesystem keeps a local copy on regular filesystem while the file is open (between open and close calls).
