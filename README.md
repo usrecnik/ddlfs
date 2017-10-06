@@ -25,15 +25,15 @@ In the latter, you can optionally use `-f` flag to run filesystem in foreground 
 
 When mounted, following directory tree is available under mountpoint:
  
- * `<schema>`
- ** function
- ** java_source
- ** package_body
- ** package_spec
- ** procedure
- ** type 
- ** type_body
- ** view
+* `<schema>`
+  * `function`
+  * `java_source`
+  * `package_body`
+  * `package_spec`
+  * `procedure`
+  * `type`
+  * `type_body`
+  * `view`
 
 Each folder has `.sql` file for each object of specified type (parent folder) in database. For example, folder `<schema>/view/`
 has list one `.sql` file for every view in this schema.
