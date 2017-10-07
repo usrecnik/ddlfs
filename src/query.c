@@ -269,6 +269,9 @@ int qry_schemas() {
     t_fsentry *ddllog = vfs_entry_create('F', "ddlfs.log", time(NULL), time(NULL));
     vfs_entry_add(g_vfs, ddllog);
 
+    vfs_entry_sort(g_vfs);
+
+
 qry_schemas_cleanup:
     if (input != NULL)
         free(input);
@@ -318,7 +321,9 @@ int qry_types(t_fsentry *schema) {
         vfs_entry_add(schema, vfs_entry_create('D', type,  time(NULL), time(NULL)));
         free(type);
     }
-    
+
+    vfs_entry_sort(schema);    
+
     return EXIT_SUCCESS;
 }
 
@@ -443,6 +448,9 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
         free(fname);
         vfs_entry_add(type, entry);    
     }
+
+    vfs_entry_sort(type);
+
 
 qry_objects_cleanup:
 

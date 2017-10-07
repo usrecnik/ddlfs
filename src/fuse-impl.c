@@ -81,6 +81,7 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
         return g_vfs;
     }
 
+    logmsg(LOG_DEBUG, "fs_vfs_by_path(loadFound=%d)", loadFound);
     t_fsentry *entries[DEPTH_MAX] = {NULL, NULL, NULL};
     for (int i = 0; i < DEPTH_MAX; i++) {
         if (path[i] == NULL) {
@@ -89,11 +90,14 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
 
             return entries[i-1];
         }
+        logmsg(LOG_DEBUG, ".. 1. vfs search:");
         entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
         if (entries[i] == NULL) {
+            logmsg(LOG_DEBUG, ".. 1. not found, requery.");
             qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
+            logmsg(LOG_DEBUG, ".. 2. vfs search (requery complete)");
             entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
-        }
+        } 
         if (entries[i] == NULL) {
             logmsg(LOG_ERROR, "File not found, depth=[%d], path_part=[%s].", i, path[i]);
             return NULL;
@@ -186,8 +190,10 @@ int fs_readdir(const char *path,
 
     filler(buffer, ".", NULL, 0);
     filler(buffer, "..", NULL, 0);
-    for (int i = 0; i < entry->count; i++)
+    for (int i = 0; i < entry->count; i++) {
         filler(buffer, entry->children[i]->fname, NULL, 0);
+        logmsg(LOG_DEBUG, ".. entry [%d] = [%s]", i, entry->children[i]->fname);
+    }
     
     fs_path_free(part);
     return 0;

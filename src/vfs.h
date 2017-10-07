@@ -12,9 +12,8 @@ typedef struct s_fsentry {
 	int 	count;
 	int     allocated; // for debugging
 } t_fsentry;
-                                                                                                 
-t_fsentry *g_vfs;
 
+t_fsentry *g_vfs;
 
 
 t_fsentry* vfs_entry_create(const char type, 
@@ -32,4 +31,5 @@ void vfs_entry_free(t_fsentry *entry, int children_only);
 
 t_fsentry* vfs_entry_search(t_fsentry *entry, const char *fname);
 
+void vfs_entry_sort(t_fsentry *parent);
 
