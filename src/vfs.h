@@ -21,6 +21,12 @@ t_fsentry* vfs_entry_create(const char type,
 							time_t created, 
 							time_t modified);
 
+t_fsentry* vfs_entry_create2(const char type, 
+							const char *fname, 
+							time_t created, 
+							time_t modified);
+
+
 void vfs_dump(t_fsentry *entry, int depth);
 
 void vfs_entry_dump(const char *msg, t_fsentry *entry);

@@ -18,8 +18,11 @@ t_fsentry* vfs_entry_create(const char type,
     if (type == 'D') {
         t->capacity = 100;
         t->children = malloc(sizeof(t_fsentry*) * t->capacity);
-        if (t->children == NULL)
+        if (t->children == NULL) {
             logmsg(LOG_ERROR, "Unable to malloc children for %s", t->fname);
+            free(t);
+            return NULL;
+        }
     } else {
         t->capacity = 0;
         t->children = NULL;
@@ -68,19 +71,14 @@ void vfs_entry_add(t_fsentry *parent, t_fsentry *child) {
     
 t_fsentry* _vfs_search(t_fsentry *entry, const char *fname, int min, int max, int depth) {
 
-    logmsg(LOG_DEBUG, "...... fname=[%s], min=[%d], max=[%d], depth=[%d]", fname, min, max, depth);
-    
     if (max == 0)
         return NULL; // no entries
 
     int pos = (min == max ? min : min + (max-min)/2);
-    if (depth > 10) {
-        logmsg(LOG_DEBUG, "........ depth > 10!");
+    if (depth > 10)
         return NULL;
-    }
     
     int cmp = strcmp(entry->children[pos]->fname, fname);
-    logmsg(LOG_DEBUG, "........ pos=[%d], cmp=[%d], [%s] =?= [%s]", pos, cmp, entry->children[pos]->fname, fname);
     if (cmp == 0)
         return entry->children[pos];
     
@@ -95,7 +93,6 @@ t_fsentry* _vfs_search(t_fsentry *entry, const char *fname, int min, int max, in
 
 // search among childrent of entry
 t_fsentry* vfs_entry_search(t_fsentry *entry, const char *fname) {
-    logmsg(LOG_DEBUG, ".... vfs_entry_search(fname=[%s])", fname);
     return _vfs_search(entry, fname, 0, entry->count, 0);
 }
 

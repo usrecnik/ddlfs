@@ -374,7 +374,7 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
             free(schema_name);
         return EXIT_FAILURE;
     }
-    
+
     struct tm *temptime = malloc(sizeof(struct tm)); 
 
     vfs_entry_free(type, 1);
@@ -384,6 +384,7 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
             logmsg(LOG_ERROR, "Unable to allocate memory for sel[%d]", i);
             return EXIT_FAILURE;
     }
+    
 
     if (ora_stmt_prepare(&o_stm, query)) {
         retval = EXIT_FAILURE;
@@ -415,10 +416,7 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
         goto qry_objects_cleanup;
     }
 
-        
-
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
-        
         memset(temptime, 0, sizeof(struct tm));
         char* xx = strptime(((char*)o_sel[1]), "%Y-%m-%d %H:%M:%S", temptime);
         if (*xx != '\0') {
@@ -426,14 +424,15 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
             retval = EXIT_FAILURE;
             goto qry_objects_cleanup;
         }
-
+        
         time_t t_modified = timegm(temptime);
-        /*
-        char *fname = malloc((strlen((char*)o_sel[0])+4)*sizeof(char));
-        strcpy(fname, (char*) o_sel[0]);
-        strcat(fname, ".SQL");
-        */
-        char *fname = malloc((strlen((char*)o_sel[0])+strlen(suffix))*sizeof(char));
+        size_t fname_len= ((strlen((char*)o_sel[0])+strlen(suffix))+1)*sizeof(char);
+        char *fname = malloc(fname_len);
+        if (fname == NULL) {
+            logmsg(LOG_ERROR, "qry_objects() - Unable to malloc for fname, fname_len=[%d]", fname_len);
+            retval = EXIT_FAILURE;
+            goto qry_objects_cleanup;
+        }
         strcpy(fname, (char*) o_sel[0]);
         strcat(fname, suffix);
          
@@ -441,14 +440,14 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
             str_lower(fname);
         
         t_fsentry *entry = vfs_entry_create('F', 
-            fname, 
+            fname,
             t_modified, 
             t_modified);
-       
+
         free(fname);
+
         vfs_entry_add(type, entry);    
     }
-
     vfs_entry_sort(type);
 
 

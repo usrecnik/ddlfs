@@ -81,7 +81,6 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
         return g_vfs;
     }
 
-    logmsg(LOG_DEBUG, "fs_vfs_by_path(loadFound=%d)", loadFound);
     t_fsentry *entries[DEPTH_MAX] = {NULL, NULL, NULL};
     for (int i = 0; i < DEPTH_MAX; i++) {
         if (path[i] == NULL) {
@@ -90,12 +89,9 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
 
             return entries[i-1];
         }
-        logmsg(LOG_DEBUG, ".. 1. vfs search:");
         entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
         if (entries[i] == NULL) {
-            logmsg(LOG_DEBUG, ".. 1. not found, requery.");
             qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
-            logmsg(LOG_DEBUG, ".. 2. vfs search (requery complete)");
             entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
         } 
         if (entries[i] == NULL) {
@@ -109,17 +105,13 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
 
 int fs_getattr( const char *path, struct stat *st )
 {
-    //vfs_dump(g_vfs, 1);
     char **part;
     int depth = fs_path_create(&part, path);    
     t_fsentry *entry = fs_vfs_by_path(part, 0);
-    //printf("\n--\n");
-    //vfs_dump(g_vfs, 1);
 
     if (strcmp(path, "/ddlfs.log") == 0) {
         st->st_uid = getuid();
         st->st_gid = getgid();
-        //logmsg(LOG_DEBUG, "Returning mtime as %d", g_ddl_log_time);
         st->st_atime = g_ddl_log_time;
         st->st_mtime = g_ddl_log_time;
         st->st_ctime = g_ddl_log_time;
@@ -190,10 +182,8 @@ int fs_readdir(const char *path,
 
     filler(buffer, ".", NULL, 0);
     filler(buffer, "..", NULL, 0);
-    for (int i = 0; i < entry->count; i++) {
+    for (int i = 0; i < entry->count; i++)
         filler(buffer, entry->children[i]->fname, NULL, 0);
-        logmsg(LOG_DEBUG, ".. entry [%d] = [%s]", i, entry->children[i]->fname);
-    }
     
     fs_path_free(part);
     return 0;
