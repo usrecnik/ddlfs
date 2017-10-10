@@ -19,6 +19,7 @@ static struct fuse_opt ddlfs_opts[] = {
     MYFS_OPT("schemas=%s",  schemas,  1),
     MYFS_OPT("loglevel=%s", loglevel, 1),
     MYFS_OPT("temppath=%s", temppath, 1),
+    MYFS_OPT("filesize=%d", filesize, 1),
     MYFS_OPT("lowercase",   lowercase, 1),
     MYFS_OPT("nolowercase", lowercase, 0),
         
@@ -95,6 +96,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     logmsg(LOG_DEBUG, ".. schemas  : [%s]", g_conf.schemas);
     logmsg(LOG_DEBUG, ".. lowercase: [%d]", g_conf.lowercase);
     logmsg(LOG_DEBUG, ".. temppath : [%s]", g_conf.temppath);
+    logmsg(LOG_DEBUG, ".. filesize : [%d]", g_conf.filesize);
     logmsg(LOG_DEBUG, ".");
     
     return args;

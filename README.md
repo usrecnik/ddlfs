@@ -87,6 +87,12 @@ Defines verbosity used for stdout messages. Default value is `INFO`.
 Where to store temporary files - offline copies of DDL statements while their files are open. 
 `/tmp` location is used by default. All files created by **ddlfs** have names prefixed by `ddlfs-<PID>` in this folder.
 
+**`filesize=`**`0`  
+All `.sql` files report file size as specified by this parameter - unless if file is currently open; correct file size 
+is always returned for currently open files. Usign default value `0` (or not specifying this parameter) should be OK for 
+most cases, however, some applications refuse to read files with zero length and only read files up to returned file size. 
+If you use such application with `ddlfs` specify this parameter to be greater than any database object (`10485760`, this 
+is 10mb, should be enough in most cases).
 
 Tips for VIM
 ------------

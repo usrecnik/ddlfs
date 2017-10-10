@@ -18,6 +18,7 @@ __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 #include "vfs.h"
 #include "logging.h"
 #include "query.h"
+#include "config.h"
 #include "fuse-impl.h"
 
 #define DEPTH_SCHEMA 0
@@ -129,7 +130,7 @@ int fs_getattr( const char *path, struct stat *st )
     }
 
     struct stat tmp_st;
-    tmp_st.st_size = 0; 
+    tmp_st.st_size = g_conf.filesize; 
 
     if (depth == DEPTH_MAX) {
         char *fname;

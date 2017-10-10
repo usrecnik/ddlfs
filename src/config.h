@@ -11,6 +11,7 @@ struct s_global_config {
     char *database;
     char *schemas;
     int   lowercase;
+    int   filesize;
     char *loglevel;
 } g_conf;
 
