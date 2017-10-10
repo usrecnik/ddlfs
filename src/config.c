@@ -89,7 +89,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     
     logmsg(LOG_DEBUG, "Parameters:");
     logmsg(LOG_DEBUG, ".. username : [%s]", g_conf.username);
-    logmsg(LOG_DEBUG, ".. password : [%s]", g_conf.password);
+    logmsg(LOG_DEBUG, ".. password : [****]"); // intentionally hidden
     logmsg(LOG_DEBUG, ".. database : [%s]", g_conf.database);
     logmsg(LOG_DEBUG, ".. loglevel : [%s]", g_conf.loglevel);
     logmsg(LOG_DEBUG, ".. schemas  : [%s]", g_conf.schemas);
