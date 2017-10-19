@@ -9,7 +9,7 @@ Installation
 
 `.rpm` and `.deb` packages were tested on:
 
-* Ubuntu versions 16.4 and 17.4
+* Ubuntu 16.4 and 17.4
 * Oracle Enterprise Linux 6.0 and 7.4
 
 Older/other versions might need to compile from source (due to different libc and fuse versions).
@@ -46,11 +46,11 @@ If you delete such `.sql` file, a `DROP <object_type> <object_name>` is issued.
 If you create new file (e.g. using `touch` utility), a new object is created from template - e.g. for views, it is 
 `create view "<schema>"."object_name" as select * from dual"`.
 
-All files have last modified date set to `last_ddl_time` from `all_objects` view. All files report file size 0, except for
-those that are currently open - those report their actual file size.
+All files have last modified date set to `last_ddl_time` from `all_objects` view. All files report file size 0 (or whatever
+number is set for `filesize=` parameter), except for those that are currently open - those report their actual, correct, file size. 
 
 One special file exists, `ddlfs.log`, which contains log of every executed DDL operation along with possible errors and 
-warnings (e.g. indicating on which line syntax error occured).
+warnings (e.g. indicating on which line syntax error occured). You can `tail -F` this file (just use capital `-F`, because this file only exists in-memory and is rewritten in cyclic manner. `tail` will report that file has been truncated when it shrinks. Such implementation was chosen in order to make sure that there is always a constant amount of memory allocated.)
 
 
 Mount Options
@@ -112,4 +112,17 @@ set backupdir^=~/.vim/tmp,/tmp
 " uniqueness in the preserve directory.
 set directory=~/.vim/swapfiles//
 ```
+
+Version Control
+---------------
+You can use this filesystem with version control software such as Git or Mercurial. So far I've tested:
+
+* Mercurial (`hg`) seems to work without any issues (just don't specify `filesize` mount option).
+* Git won't work properly in current release, because it expects filesystem to report correct filesizes. I'm currently 
+working on this - it should be supported in the next release. However, providing correct filesizes means 
+reading DDL of specific object even when only its file *attributes* (not contents) are requested. Thus, I expect 
+slightly worse performance in this optional mode.
+* Subversion won't work because it wants to create `.svn` subfolder in *every* folder. Problem is that ddlfs only 
+supports storing of DDL in `.sql` files. (Git and Mercurial only require one folder bellow mountpoint and that's all)
+
 
