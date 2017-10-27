@@ -28,6 +28,8 @@ sword ora_stmt_prepare(OCIStmt **stm, const char *query);
 
 sword ora_stmt_define(OCIStmt *stm, OCIDefine **def, ub4 pos, void *value, sb4 value_size, ub2 dty);
 
+sword ora_stmt_define_i(OCIStmt *stm, OCIDefine **def, ub4 pos, void *value, sb4 value_size, ub2 dty, dvoid *indp);
+
 sword ora_stmt_bind(OCIStmt *stm, OCIBind **bnd, ub4 pos, void *value, sb4 value_size, ub2 dty);
 
 sword ora_stmt_execute(OCIStmt *stm, ub4 iters);

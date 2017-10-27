@@ -12,6 +12,7 @@ t_fsentry* vfs_entry_create(const char type,
     t_fsentry *t = malloc(sizeof(t_fsentry));
     t->ftype = type;
     t->fname = strdup(fname);
+    t->fsize = 0;
     t->created = created;
     t->modified = modified;
     t->count = 0;

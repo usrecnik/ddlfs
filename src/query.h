@@ -34,12 +34,14 @@ void qry_objects(t_fsentry *schema, t_fsentry *type);
 
 /**
  * Write DDL to of object specified by schema,type,object parameters to file name fname.
+ * Parameters are those available in vfs (actual filesystem path parts), not yet converted to 
+ * actual database object names (str_fn2obj).
  * fname is determined by this function.
  * */
 int qry_object(const char *schema, 
-			   const char *type, 
-			   const char *object,
-			   char **fname);
+               const char *type, 
+               const char *object,
+               char **fname);
 
 /**
  * Assamble temporary filename based on schema, type and object.

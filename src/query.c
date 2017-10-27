@@ -5,6 +5,7 @@
 #include <search.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <utime.h>
@@ -13,6 +14,7 @@
 #include "logging.h"
 #include "oracle.h"
 #include "vfs.h"
+#include "tempfs.h"
 
 #define LOB_BUFFER_SIZE 8196
 
@@ -67,10 +69,24 @@ int str_suffix(char **dst, const char *objectType) {
     else
         strcpy(suffix, ".SQL");
     
-    logmsg(LOG_DEBUG, "str_suffix() - returning suffix [%s] for type [%s]", suffix, type);
+    // logmsg(LOG_DEBUG, "str_suffix() - returning suffix [%s] for type [%s]", suffix, type);
 
     *dst = suffix;
 
+    return EXIT_SUCCESS;
+}
+
+int qry_object_fname(const char *schema,
+                     const char *type,
+                     const char *object,
+                     char **fname) {
+    *fname = malloc(PATH_MAX * sizeof(char));
+    if (*fname == NULL) {
+        logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", PATH_MAX);
+        return EXIT_FAILURE;
+    }
+    snprintf(*fname, PATH_MAX, "%s/ddlfs-%d-%s.%s.%s.tmp", 
+        g_conf.temppath, getpid(), schema, type, object);
     return EXIT_SUCCESS;
 }
 
@@ -159,6 +175,477 @@ static int str_fs2oratype(char **fstype) {
     
     *fstype= type;
     return EXIT_SUCCESS;
+}
+
+static int qry_object_dbms_metadata(const char *schema, 
+                                    const char *type, 
+                                    const char *object,                                   
+                                    const char *fname,
+                                    const int is_java_source,
+                                          time_t *last_ddl_time) {
+    
+    int retval = EXIT_SUCCESS;
+    char *query = NULL;
+    if (g_conf.filesize != -1)
+        query = 
+"select dbms_metadata.get_ddl(\
+:bind_type, :bind_object, :bind_schema) \
+as retval from dual";
+    else
+        query = 
+"select \
+dbms_metadata.get_ddl(o.object_type, o.object_name, o.owner), \
+o.last_ddl_time \
+from all_objects o \
+where o.object_type=:bind_type \
+and o.object_name=:bind_object \
+and o.owner=:bind_schema";
+
+    OCILobLocator *o_lob = NULL; // free
+    OCIStmt       *o_stm = NULL; // free
+    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
+    OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when 
+    OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
+    OCIBind       *o_bn3 = NULL;
+    char          *o_sel = NULL;
+    sb2            o_sel_i = 0;
+
+    char *buf = malloc(LOB_BUFFER_SIZE); // free
+    oraub8 buf_blen = LOB_BUFFER_SIZE;
+    oraub8 buf_clen = 0;
+    int lob_offset = 1;
+    
+    FILE *fp = NULL; // free    
+    size_t bytes_written;
+    
+    if (buf == NULL) {
+        logmsg(LOG_ERROR, "Unable to malloc lob buffer (size=%d).", LOB_BUFFER_SIZE);
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+
+    if (g_conf.filesize == -1) {
+        if ((o_sel = malloc(30*sizeof(char))) == NULL) {
+            logmsg(LOG_ERROR, "qry_object_dbms_metadata - Unable to allocate memory for o_sel.");
+            retval = EXIT_FAILURE;
+            goto qry_object_dbms_metadata_cleanup;
+        }
+    }
+    
+    if (ora_lob_alloc(&o_lob)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+    
+    if (ora_stmt_prepare(&o_stm, query)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+      
+    if (ora_stmt_define(o_stm, &o_def, 1, &o_lob, 0, SQLT_CLOB)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+
+    if (g_conf.filesize == -1) {
+        if (ora_stmt_define_i(o_stm, &o_def, 2, o_sel, 30*sizeof(char), SQLT_STR, (dvoid*) &o_sel_i)) {
+            retval = EXIT_FAILURE;
+            goto qry_object_dbms_metadata_cleanup;
+        }
+    }
+   
+    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object, strlen(object)+1, SQLT_STR))  {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+
+    if (ora_stmt_execute(o_stm, 1)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+    
+    if (g_conf.filesize == -1) {
+        if (tfs_validate(fname, o_sel, last_ddl_time) == EXIT_SUCCESS) {
+            logmsg(LOG_DEBUG, "qry_object_dbms_metadata - tempfile [%s] is up2date.");
+            goto qry_object_dbms_metadata_cleanup; // this is a bit ugly, but it's short and it works :)
+        }
+    }
+    
+    fp = fopen(fname, "w");
+    if (fp == NULL) {
+        logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
+    }
+    
+    int first = 1;
+    int first_offset = 0;
+    while (buf_blen > 0) {
+        if (ora_check(
+            OCILobRead2(
+                g_connection.svc,
+                g_connection.err,
+                o_lob,
+                &buf_blen, 
+                &buf_clen,
+                lob_offset, // offset
+                buf,
+                LOB_BUFFER_SIZE, // buffer size
+                OCI_ONE_PIECE, // Fs.
+                NULL,
+                NULL,
+                0,
+                SQLCS_IMPLICIT))) {
+                    retval = EXIT_FAILURE;
+                    goto qry_object_dbms_metadata_cleanup;
+        }
+        lob_offset += buf_blen;
+
+        if (first) {
+            // remove "create java source" from first line
+            first_offset = 0;
+            if (is_java_source == 1) {
+                first_offset = 1; // because first character is always '\n'
+                for (; first_offset < buf_blen; first_offset++)
+                    if (buf[first_offset] == '\n' || buf[first_offset] == '\r')
+                        break;
+            }
+            
+            // trim leading spaces and newlines. I'm not sure why dbms_metadata
+            // writes them anyway as they are totaly useless.
+            for (; first_offset < buf_blen; first_offset++) 
+                if (buf[first_offset] != ' ' && buf[first_offset] != '\n' && buf[first_offset] != '\r')
+                    break;            
+            
+            bytes_written = fwrite(buf + first_offset, 1, buf_blen - first_offset, fp);
+            buf_blen -= first_offset;
+        } else { 
+            bytes_written = fwrite(buf, 1, buf_blen, fp);
+        }
+        
+        if (bytes_written != buf_blen) {
+            retval = EXIT_FAILURE;
+            logmsg(LOG_ERROR, "Bytes written (%d) != Bytes read (%d)", 
+                bytes_written, buf_blen);
+            goto qry_object_dbms_metadata_cleanup;
+        }
+        first=0;
+    }
+    
+     
+qry_object_dbms_metadata_cleanup:
+
+    if (buf != NULL)
+        free(buf);
+    
+    if (o_lob != NULL)
+        ora_lob_free(o_lob);
+
+    if (o_stm != NULL)
+        ora_stmt_free(o_stm);
+
+    if (o_sel != NULL)
+        free(o_sel);
+
+    if ( (fp != NULL) && (fclose(fp) != 0) )
+        logmsg(LOG_ERROR, "qry_object_dbms_metadata() - Unable to close FILE* (cleanup)");
+    
+    return retval;
+}
+
+static int qry_object_all_source(const char *schema, 
+                                       char *type,
+                                 const char *object,
+                                 const char *fname,
+                                 const  int is_java_source,
+                                     time_t *last_ddl_time) {
+    
+    int retval = EXIT_SUCCESS;
+    char *query = NULL;
+    if (g_conf.filesize != -1)
+        query = // select on all_source view only
+"select nvl(\"TEXT\", '\n') from all_source \
+where \"TYPE\"=:bind_type and \"NAME\"=:bind_object and \"OWNER\"=:bind_schema \
+order by \"LINE\"";
+    else {
+        query = // join all_objects to obtain last_ddl_time in first returned row
+"select nvl(s.\"TEXT\", '\n') as s, \
+case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t \
+from all_source s \
+join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
+where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
+order by s.\"LINE\"";
+    }
+    
+    
+    OCIStmt       *o_stm = NULL; // free
+    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
+    char          *o_sl1 = NULL; // renamed from o_sel
+    char          *o_sl2 = NULL;
+    sb2            o_sl2i = 0;   // null indicator for o_sl2
+    OCIBind       *o_bn1 = NULL; // The bind handles are freed implicitly when 
+    OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
+    OCIBind       *o_bn3 = NULL;
+    char          *tmpstr = NULL;
+
+    size_t bytes_written;
+    FILE *fp = NULL; // free
+    
+    if ((o_sl1 = malloc(4096*sizeof(char))) == NULL) {
+        logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sl1."); 
+        return EXIT_FAILURE;
+    }
+
+    if ((tmpstr = malloc(4096*sizeof(char))) == NULL) {
+        logmsg(LOG_ERROR, "qry_object_all_source - unable to allocate memory for tmpstr.");
+        free(o_sl1);
+        return EXIT_FAILURE;
+    }
+    
+    if (g_conf.filesize == -1) {
+        if ((o_sl2 = malloc(30*sizeof(char))) == NULL) {
+            logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sl2.");
+            return EXIT_FAILURE;
+        }
+    }
+
+    
+    // query 
+    if (ora_stmt_prepare(&o_stm, query)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
+    }
+      
+    if (ora_stmt_define(o_stm, &o_def, 1, o_sl1, 4096*sizeof(char), SQLT_STR)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
+    }
+    
+    if (g_conf.filesize == -1) {
+        if (ora_stmt_define_i(o_stm, &o_def, 2, o_sl2, 30*sizeof(char), SQLT_STR, &o_sl2i)) {
+            retval = EXIT_FAILURE;
+            goto qry_object_all_source_cleanup;
+        }
+    }
+   
+    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object, strlen(object)+1, SQLT_STR))  {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
+    }
+
+    if (ora_stmt_execute(o_stm, 0)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
+    }
+    
+    int first = 1;
+    int type_spaces = 0;
+    char *tmp = type;
+    char *org = NULL;
+
+    for(; *tmp != '\0'; tmp++)
+        if (*tmp == ' ')
+            type_spaces++;
+
+    while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+        if (first) {
+            if (g_conf.filesize == -1) {
+                if (tfs_validate(fname, o_sl2, last_ddl_time) == EXIT_SUCCESS) {
+                    logmsg(LOG_DEBUG, "qry_object_all_source - tempfile [%s] is up2date.");
+                    break;
+                }
+            }
+             
+            fp = fopen(fname, "w");
+            if (fp == NULL) {
+                logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
+                retval = EXIT_FAILURE;
+                goto qry_object_all_source_cleanup;
+            }
+
+            if (!is_java_source) {
+                sprintf(tmpstr, "CREATE OR REPLACE %s \"%s\".", type, schema);
+                fwrite(tmpstr, 1, strlen(tmpstr), fp);
+            }
+        }
+        
+        if (!is_java_source && first) {
+            // replace multiple spaces with single space
+            org = o_sl1;
+            tmp = o_sl1;
+            while (*tmp != '\0') {
+                while (*tmp == ' ' && *(tmp + 1) == ' ')
+                    tmp++;
+                
+                *(org++) = *(tmp++);
+            }
+            *org = '\0';
+
+            // skip first word(s)
+            org = o_sl1;
+            tmp = o_sl1;
+            for (int i = 0; i < type_spaces+1; i++) {
+                while (*tmp != '\0' && *tmp != ' ')
+                    tmp++;
+                if (*tmp == ' ')
+                    tmp++;
+            }
+            
+            bytes_written = fwrite(tmp, 1, strlen(tmp), fp);
+            if (bytes_written != strlen(tmp)) {
+                retval = EXIT_FAILURE;
+                logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(tmp));
+                goto qry_object_all_source_cleanup;
+            }
+            
+        } else {
+            bytes_written = fwrite(o_sl1, 1, strlen(o_sl1), fp);
+            if (bytes_written != strlen(o_sl1)) {
+                retval = EXIT_FAILURE;
+                logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(o_sl1));
+                goto qry_object_all_source_cleanup;
+            }
+            
+            if (is_java_source)
+                fwrite("\n", 1, 1, fp);
+        }
+
+        first=0;
+    }
+    
+     
+qry_object_all_source_cleanup:
+
+    if (o_sl1 != NULL)
+        free(o_sl1);
+
+    if (o_sl2 != NULL)
+        free(o_sl2);
+
+    if (tmpstr != NULL)
+        free(tmpstr);    
+
+    if (o_stm != NULL)
+        ora_stmt_free(o_stm);
+
+    if ( (fp != NULL) && (fclose(fp) != 0) )
+        logmsg(LOG_ERROR, "qry_object_all_source() - Unable to close FILE* (qry_object_cleanup)");
+    
+    return retval;
+}
+
+
+int qry_object(char *schema, 
+               char *type,
+               char *object,
+               char **fname) {
+
+    int retval = EXIT_SUCCESS;
+    char *object_schema = NULL;
+    char *object_type = NULL;
+    char *object_name = NULL;
+    int is_java_source = 0;
+    struct utimbuf newtime;
+    time_t last_ddl_time = 0;
+        
+    // determine fname
+    if (qry_object_fname(schema, type, object, fname) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object_all_source() - unable to determine filename, qry_object_fname() failed.");
+        return EXIT_FAILURE;
+    }
+    
+    // normalize parameters
+    if (str_fn2obj(&object_schema, schema, NULL) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object() - unable to normalize object_schema.");
+        if (object_schema != NULL) free(object_schema);
+        if (object_type != NULL) free(object_type);
+        if (object_name != NULL) free(object_name);
+        return EXIT_FAILURE;
+    }
+
+    if (str_fn2obj(&object_type, type, NULL) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object() - unable to normalize object_type.");
+        if (object_schema != NULL) free(object_schema);
+        if (object_type != NULL) free(object_type);
+        if (object_name != NULL) free(object_name);
+        return EXIT_FAILURE;
+    }
+    
+    if (str_fn2obj(&object_name, object, type) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object() - unable to normalize object_name.");
+        if (object_schema != NULL) free(object_schema);
+        if (object_type != NULL) free(object_type);
+        if (object_name != NULL) free(object_name);
+        return EXIT_FAILURE;
+    }
+
+    str_upper(object_type);
+    if (str_fs2oratype(&object_type) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object() - unable to convert fs type to ora type.");
+        if (object_schema != NULL) free(object_schema);
+        if (object_type != NULL) free(object_type);
+        if (object_name != NULL) free(object_name); 
+        return EXIT_FAILURE;
+    }
+    
+    is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
+    
+    
+    // actuall call correct implementation:
+    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0))
+        // because only dbms_metadata supports getting source of VIEW objects 
+        retval = qry_object_dbms_metadata(object_schema, object_type, object_name, *fname, is_java_source, &last_ddl_time);
+    else if ((strcmp(type, "JAVA_SOURCE") == 0) || (strcmp(type, "java_source") == 0))
+        // because dbms_metadata strips all newlines from java source and is thus unusable for this purpose
+        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, &last_ddl_time);
+    else
+        // either implementation could be used, but all_source should be slightly faster
+        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, &last_ddl_time);
+    
+    // set standard file attributes on cached file (atime & mtime)
+    newtime.actime = time(NULL);
+    newtime.modtime = 0; // important. If this changes to anything else, we know that a write occured on
+                         // underlying filesystem. (if file was opened as R/W, that does not mean it actually changed
+                         // and that we need to execute DDL upon process closing it)
+    if (utime(*fname, &newtime) == -1) {
+        logmsg(LOG_ERROR, "qry_object() - unable to reset file modification time!");
+        retval = EXIT_FAILURE;
+    }
+
+    // set extended file attribute on cache file (last_ddl_time)
+    if (tfs_setldt(*fname, last_ddl_time) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object() - unable to set last_ddl_time on [%s], caching won't work (= disabled)", *fname);
+        // this is not a fatal error - it should only have impact on performance, not functionality.
+    } else {
+        logmsg(LOG_DEBUG, "qry_object() - set LDT for [%s] to [%d]", *fname, last_ddl_time);
+    }
+    
+    // cleanup
+    free(object_schema);
+    free(object_type);
+    free(object_name);
+    
+    return retval;
 }
 
 int qry_schemas() {
@@ -327,6 +814,22 @@ int qry_types(t_fsentry *schema) {
     return EXIT_SUCCESS;
 }
 
+static int qry_objects_filesize(t_fsentry *schema, t_fsentry *type) {
+    for (int i = 0; i < type->count; i++) {
+        t_fsentry *object = type->children[i];
+        char *fname; // physical temp file name
+        
+        qry_object(schema->fname, type->fname, object->fname, &fname);
+
+        struct stat st;
+        stat(fname, &st);
+
+        object->fsize = st.st_size;
+    }
+    
+    return EXIT_SUCCESS;
+}
+
 int qry_objects(t_fsentry *schema, t_fsentry *type) {
     int retval = EXIT_SUCCESS;
     char *query = "select \
@@ -450,6 +953,7 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
     }
     vfs_entry_sort(type);
 
+    qry_objects_filesize(schema, type);
 
 qry_objects_cleanup:
 
@@ -469,391 +973,6 @@ qry_objects_cleanup:
         if (o_sel[i] != NULL)
             free(o_sel[i]);
 
-    return retval;
-}
-
-int qry_object_fname(const char *schema,
-                     const char *type,
-                     const char *object,
-                     char **fname) {
-    *fname = malloc(PATH_MAX * sizeof(char));
-    if (*fname == NULL) {
-        logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", PATH_MAX);
-        return EXIT_FAILURE;
-    }
-    snprintf(*fname, PATH_MAX, "%s/ddlfs-%d-%s.%s.%s.tmp", 
-        g_conf.temppath, getpid(), schema, type, object);
-    return EXIT_SUCCESS;
-}
-
-
-static int qry_object_dbms_metadata(const char *schema, 
-                                    const char *type, 
-                                    const char *object,                                   
-                                    const char *fname,
-                                    const int is_java_source) {
-    
-    int retval = EXIT_SUCCESS;
-    const char *query = 
-"select dbms_metadata.get_ddl(\
-:bind_type, :bind_object, :bind_schema) \
-as retval from dual";
-
-    OCILobLocator *o_lob = NULL; // free
-    OCIStmt       *o_stm = NULL; // free
-    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
-    OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when 
-    OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
-    OCIBind       *o_bn3 = NULL;
-    
-    char *buf = malloc(LOB_BUFFER_SIZE); // free
-    oraub8 buf_blen = LOB_BUFFER_SIZE;
-    oraub8 buf_clen = 0;
-    int lob_offset = 1;
-    
-    FILE *fp = NULL; // free    
-    size_t bytes_written;
-    
-    if (buf == NULL) {
-        logmsg(LOG_ERROR, "Unable to malloc lob buffer (size=%d).", LOB_BUFFER_SIZE);
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-    
-    if (ora_lob_alloc(&o_lob)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-    
-    if (ora_stmt_prepare(&o_stm, query)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-      
-    if (ora_stmt_define(o_stm, &o_def, 1, &o_lob, 0, SQLT_CLOB)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-   
-    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object, strlen(object)+1, SQLT_STR))  {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_execute(o_stm, 1)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-    
-    fp = fopen(fname, "w");
-    if (fp == NULL) {
-        logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-    
-    int first = 1;
-    int first_offset = 0;
-    while (buf_blen > 0) {
-        if (ora_check(
-            OCILobRead2(
-                g_connection.svc,
-                g_connection.err,
-                o_lob,
-                &buf_blen, 
-                &buf_clen,
-                lob_offset, // offset
-                buf,
-                LOB_BUFFER_SIZE, // buffer size
-                OCI_ONE_PIECE, // Fs.
-                NULL,
-                NULL,
-                0,
-                SQLCS_IMPLICIT))) {
-                    retval = EXIT_FAILURE;
-                    goto qry_object_dbms_metadata_cleanup;
-        }
-        lob_offset += buf_blen;
-
-        if (first) {
-            // remove "create java source" from first line
-            first_offset = 0;
-            if (is_java_source == 1) {
-                first_offset = 1; // because first character is always '\n'
-                for (; first_offset < buf_blen; first_offset++)
-                    if (buf[first_offset] == '\n' || buf[first_offset] == '\r')
-                        break;
-            }
-            
-            // trim leading spaces and newlines. I'm not sure why dbms_metdata
-            // writes them anyway as they are totaly useless.
-            for (; first_offset < buf_blen; first_offset++) 
-                if (buf[first_offset] != ' ' && buf[first_offset] != '\n' && buf[first_offset] != '\r')
-                    break;            
-            
-            bytes_written = fwrite(buf + first_offset, 1, buf_blen - first_offset, fp);
-            buf_blen -= first_offset;
-        } else { 
-            bytes_written = fwrite(buf, 1, buf_blen, fp);
-        }
-        
-        if (bytes_written != buf_blen) {
-            retval = EXIT_FAILURE;
-            logmsg(LOG_ERROR, "Bytes written (%d) != Bytes read (%d)", 
-                bytes_written, buf_blen);
-            goto qry_object_dbms_metadata_cleanup;
-        }
-        first=0;
-    }
-    
-     
-qry_object_dbms_metadata_cleanup:
-
-    if (buf != NULL)
-        free(buf);
-    
-    if (o_lob != NULL)
-        ora_lob_free(o_lob);
-
-    if (o_stm != NULL)
-        ora_stmt_free(o_stm);
-
-    if ( (fp != NULL) && (fclose(fp) != 0) )
-        logmsg(LOG_ERROR, "qry_object_dbms_metadata() - Unable to close FILE* (cleanup)");
-    
-    return retval;
-}
-
-static int qry_object_all_source(const char *schema, 
-                                       char *type,
-                                 const char *object,
-                                 const char *fname,
-                                 const int is_java_source) {
-    
-    int retval = EXIT_SUCCESS;
-    const char *query = 
-"select NVL(\"TEXT\", '\n') from all_source \
-where \"TYPE\"=:bind_type and \"NAME\"=:bind_object and \"OWNER\"=:bind_schema \
-order by \"LINE\"";
-     
-    OCIStmt       *o_stm = NULL; // free
-    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
-    char          *o_sel = NULL;
-    OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when 
-    OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
-    OCIBind       *o_bn3 = NULL;
-    
-    size_t bytes_written;
-    FILE *fp = NULL; // free
-    
-    if ((o_sel = malloc(4096*sizeof(char))) == NULL) {
-        logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sel."); 
-        return EXIT_FAILURE;
-    }
-    
-    // query 
-    if (ora_stmt_prepare(&o_stm, query)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-      
-    if (ora_stmt_define(o_stm, &o_def, 1, o_sel, 4096*sizeof(char), SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-   
-    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object, strlen(object)+1, SQLT_STR))  {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (ora_stmt_execute(o_stm, 0)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-    
-    fp = fopen(fname, "w");
-    if (fp == NULL) {
-        logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (!is_java_source) {
-        sprintf(o_sel, "CREATE OR REPLACE %s \"%s\".", type, schema);
-        fwrite(o_sel, 1, strlen(o_sel), fp);
-    }
-    
-    int first = 1;
-    int type_spaces = 0;
-    char *tmp = type;
-    char *org = NULL;
-
-    for(; *tmp != '\0'; tmp++)
-        if (*tmp == ' ')
-            type_spaces++;
-
-    while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
-        if (!is_java_source && first) {
-            // replace multiple spaces with single space
-            org = o_sel;
-            tmp = o_sel;
-            while (*tmp != '\0') {
-                while (*tmp == ' ' && *(tmp + 1) == ' ')
-                    tmp++;
-                
-                *(org++) = *(tmp++);
-            }
-            *org = '\0';
-
-            // skip first word(s)
-            org = o_sel;
-            tmp = o_sel;
-            for (int i = 0; i < type_spaces+1; i++) {
-                while (*tmp != '\0' && *tmp != ' ')
-                    tmp++;
-                if (*tmp == ' ')
-                    tmp++;
-            }
-
-            bytes_written = fwrite(tmp, 1, strlen(tmp), fp);
-            if (bytes_written != strlen(tmp)) {
-                retval = EXIT_FAILURE;
-                logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(tmp));
-                goto qry_object_all_source_cleanup;
-            }
-            
-        } else {
-            bytes_written = fwrite(o_sel, 1, strlen(o_sel), fp);
-            if (bytes_written != strlen(o_sel)) {
-                retval = EXIT_FAILURE;
-                logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(o_sel));
-                goto qry_object_all_source_cleanup;
-            }
-            
-            if (is_java_source)
-                fwrite("\n", 1, 1, fp);
-        }
-
-        first=0;
-    }
-    
-     
-qry_object_all_source_cleanup:
-
-    if (o_sel != NULL)
-        free(o_sel);
-    
-    if (o_stm != NULL)
-        ora_stmt_free(o_stm);
-
-    if ( (fp != NULL) && (fclose(fp) != 0) )
-        logmsg(LOG_ERROR, "qry_object_all_source() - Unable to close FILE* (qry_object_cleanup)");
-    
-    return retval;
-}
-
-int qry_object(char *schema, 
-               char *type,
-               char *object,
-               char **fname) {
-
-    int retval = EXIT_SUCCESS; 
-    char *object_schema = NULL;
-    char *object_type = NULL;
-    char *object_name = NULL; 
-    int is_java_source = 0;
-    struct utimbuf newtime;    
-    
-    // determine fname
-    if (qry_object_fname(schema, type, object, fname) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "qry_object_all_source() - unable to determine filename, qry_object_fname() failed.");
-        return EXIT_FAILURE;
-    }
-    
-    // normalize parameters
-    if (str_fn2obj(&object_schema, schema, NULL) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "qry_object() - unable to normalize object_schema.");
-        if (object_schema != NULL) free(object_schema);
-        if (object_type != NULL) free(object_type);
-        if (object_name != NULL) free(object_name);
-        return EXIT_FAILURE;
-    }
-
-    if (str_fn2obj(&object_type, type, NULL) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "qry_object() - unable to normalize object_type.");
-        if (object_schema != NULL) free(object_schema);
-        if (object_type != NULL) free(object_type);
-        if (object_name != NULL) free(object_name);
-        return EXIT_FAILURE;
-    }
-    
-    if (str_fn2obj(&object_name, object, type) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "qry_object() - unable to normalize object_name.");
-        if (object_schema != NULL) free(object_schema);
-        if (object_type != NULL) free(object_type);
-        if (object_name != NULL) free(object_name);
-        return EXIT_FAILURE;
-    }
-
-    str_upper(object_type);
-    if (str_fs2oratype(&object_type) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "qry_object() - unable to convert fs type to ora type.");
-        if (object_schema != NULL) free(object_schema);
-        if (object_type != NULL) free(object_type);
-        if (object_name != NULL) free(object_name); 
-        return EXIT_FAILURE;
-    }
-    
-    is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
-    
-    
-    // actuall call correct implementation:
-    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0))
-        // because only dbms_metadata supports getting source of VIEW objects 
-        retval = qry_object_dbms_metadata(object_schema, object_type, object_name, *fname, is_java_source);
-    else if ((strcmp(type, "JAVA_SOURCE") == 0) || (strcmp(type, "java_source") == 0))
-        // because dbms_metadata strips all newlines from java source and is thus unusable for this purpose
-        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source);
-    else
-        // either implementation could be used, but all_source should be slightly faster
-        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source);
-
-    // set timestamp
-    newtime.actime = time(NULL);
-    newtime.modtime = 0; // important. If this changes to anything else, we know that a write occured on
-                         // underlying filesystem. (if file was opened as R/W, that does not mean it actually changed
-                         // and that we need to execute DDL upon process closing it)
-    if (utime(*fname, &newtime) == -1) {
-        logmsg(LOG_ERROR, "qry_object() - unable to reset file modification time!");
-        retval = EXIT_FAILURE;
-    }
-      
-    // cleanup
-    free(object_schema);
-    free(object_type);
-    free(object_name);
-    
     return retval;
 }
 

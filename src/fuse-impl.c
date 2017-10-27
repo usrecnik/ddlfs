@@ -1,4 +1,6 @@
+#define _BSD_SOURCE
 #define _GNU_SOURCE
+#define _XOPEN_SOURCE
 
 __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 
@@ -19,6 +21,7 @@ __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 #include "logging.h"
 #include "query.h"
 #include "config.h"
+#include "tempfs.h"
 #include "fuse-impl.h"
 
 #define DEPTH_SCHEMA 0
@@ -96,7 +99,7 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
             entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
         } 
         if (entries[i] == NULL) {
-            logmsg(LOG_ERROR, "File not found, depth=[%d], path_part=[%s].", i, path[i]);
+            // logmsg(LOG_ERROR, "File not found, depth=[%d], path_part=[%s].", i, path[i]);
             return NULL;
         }
     }
@@ -107,7 +110,7 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
 int fs_getattr( const char *path, struct stat *st )
 {
     char **part;
-    int depth = fs_path_create(&part, path);    
+    int depth = fs_path_create(&part, path);
     t_fsentry *entry = fs_vfs_by_path(part, 0);
 
     if (strcmp(path, "/ddlfs.log") == 0) {
@@ -136,7 +139,6 @@ int fs_getattr( const char *path, struct stat *st )
         char *fname;
         qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
         stat(fname, &tmp_st);
-        //logmsg(LOG_DEBUG, "getattr: reading real size for [%s] = [%d]", fname, tmpsize);
     }    
 
     st->st_uid = getuid();
@@ -154,12 +156,6 @@ int fs_getattr( const char *path, struct stat *st )
         st->st_size = tmp_st.st_size;
     }
     
-    if (depth == DEPTH_MAX) {
-        if (strcmp(part[DEPTH_OBJECT], "R") == 0) {
-            logmsg(LOG_DEBUG, "..R; uid=[%d], gid=[%d], atime=[%d], mtime=[%d], ctime=[%d], nlink=[%d], mode=[%d], size=[%d]",
-                st->st_uid, st->st_gid, st->st_atime, st->st_mtime, st->st_ctime, st->st_nlink, st->st_mode, st->st_size);
-        }
-    }
     return 0;
 }
 
@@ -317,6 +313,7 @@ int fs_release(const char *path,
     char *buf = NULL;
     int fd = -1;
     int is_java_source = 0;
+    int cache_already_removed = 0;
 
     if (strcmp(path, "/ddlfs.log") == 0)
         return 0;
@@ -375,6 +372,7 @@ int fs_release(const char *path,
                 goto fs_release_final;
             }            
             buf[0] = '\0';
+
             size_t newLenJava = 0;
             if (is_java_source == 1)
                 newLenJava = sprintf(buf, "CREATE OR REPLACE AND COMPILE JAVA SOURCE NAMED \"%s\".\"%s\" AS\n",
@@ -389,17 +387,25 @@ int fs_release(const char *path,
             logmsg(LOG_DEBUG, "Read %d bytes", newLen);
             // newLen++;
             buf[newLen+newLenJava] = '\0';
-            
+
             qry_exec_ddl(object_schema, object_name, buf);
-            logmsg(LOG_DEBUG, "Write Buffer [%s]", buf);
+            
+            if (tfs_rmfile(fname) != EXIT_SUCCESS) {
+                logmsg(LOG_ERROR, "fs_release - unable to remove cache file [%s] after DDL.", fname);
+            }
+            cache_already_removed = 1;
         }
     }
 
-    if (unlink(fname) != 0) {
-        logmsg(LOG_ERROR, "Unable to delete underlying file (%s), error=%d", fname, errno);
-        return -errno;
+    // @todo - consider *never* deleting this file here (and delete all temp files on umount).
+    if (g_conf.filesize != -1) {
+        // delete temp file. g_conf.filesie=-1 means exact filesizes. deleting this file would 
+        // invalidate cached files (which would be cause a bit of performance degradation, 
+        // functionally it wold be ok)
+        
+        if ((cache_already_removed == 0) && (tfs_rmfile(fname) != EXIT_SUCCESS))
+            logmsg(LOG_ERROR, "fs_release - unable to remove cached file [%s]", fname);
     }
-
     
 fs_release_final:
 

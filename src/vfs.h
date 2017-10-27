@@ -4,7 +4,8 @@
 
 typedef struct s_fsentry {
     char    ftype;
-    char    *fname; 
+    char    *fname;
+    off_t   fsize;
     time_t  created;  
     time_t  modified;
     struct  s_fsentry **children;

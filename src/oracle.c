@@ -138,6 +138,13 @@ sword ora_stmt_define(OCIStmt *stm, OCIDefine **def, ub4 pos, void *value, sb4 v
     return r;
 }
 
+sword ora_stmt_define_i(OCIStmt *stm, OCIDefine **def, ub4 pos, void *value, sb4 value_size, ub2 dty, dvoid *indp) {
+    sword r = OCIDefineByPos(
+        stm, def, g_connection.err, pos, value, value_size, dty, indp, 0, 0, OCI_DEFAULT);
+    ora_check(r);
+    return r;
+}
+
 sword ora_stmt_bind(OCIStmt *stm, OCIBind **bnd, ub4 pos, void *value, sb4 value_size, ub2 dty) {
     sword r = OCIBindByPos(
         stm, bnd, g_connection.err, pos, value, value_size, dty, 
