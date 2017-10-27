@@ -195,7 +195,7 @@ as retval from dual";
         query = 
 "select \
 dbms_metadata.get_ddl(o.object_type, o.object_name, o.owner), \
-o.last_ddl_time \
+to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') \
 from all_objects o \
 where o.object_type=:bind_type \
 and o.object_name=:bind_object \
@@ -231,7 +231,7 @@ and o.owner=:bind_schema";
             goto qry_object_dbms_metadata_cleanup;
         }
     }
-    
+   
     if (ora_lob_alloc(&o_lob)) {
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
@@ -253,7 +253,7 @@ and o.owner=:bind_schema";
             goto qry_object_dbms_metadata_cleanup;
         }
     }
-   
+
     if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
@@ -287,7 +287,7 @@ and o.owner=:bind_schema";
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
     }
-    
+
     int first = 1;
     int first_offset = 0;
     while (buf_blen > 0) {
@@ -341,7 +341,7 @@ and o.owner=:bind_schema";
         }
         first=0;
     }
-    
+
      
 qry_object_dbms_metadata_cleanup:
 

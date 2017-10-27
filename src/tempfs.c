@@ -137,8 +137,8 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
         logmsg(LOG_ERROR, "tfs_validate - unable to allocate memory for temptime");
         return EXIT_FAILURE;
     }
-     
-    // convert last_ddl_time to binary format time_t            
+    
+    // convert last_ddl_time to binary format time_t
     memset(temptime, 0, sizeof(struct tm));
     char* xx = strptime((char*) last_ddl_time, "%Y-%m-%d %H:%M:%S", temptime);
     if (*xx != '\0') {
@@ -167,7 +167,7 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
         logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is already up2date.", cache_fn);
         return EXIT_SUCCESS;
     }
-
+    
     logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is outdated.", cache_fn);
     return EXIT_FAILURE;
 }
