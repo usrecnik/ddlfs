@@ -34,3 +34,9 @@ int tfs_rmfile(const char *cache_fn);
  * */
 int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual_time);
 
+/**
+ * Create temporary directory for cached files (cached ddl content). 
+ * This folder may be removed on umount (depending on parameters).
+ * */
+int tfs_mkdir();
+

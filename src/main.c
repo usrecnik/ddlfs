@@ -17,6 +17,7 @@
 #include "oracle.h"
 #include "query.h"
 #include "vfs.h"
+#include "tempfs.h"
 
 int main(int argc, char *argv[]) {
     memset(&g_conf, 0, sizeof(g_conf));
@@ -54,6 +55,11 @@ int main(int argc, char *argv[]) {
     
     if (ora_connect(g_conf.username, g_conf.password, g_conf.database) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "Unable to connect to database.");
+        return EXIT_SUCCESS;
+    }
+
+    if (tfs_mkdir() != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "Unable to initialize temp directory (%s)", g_conf.temppath);
         return EXIT_SUCCESS;
     }
 

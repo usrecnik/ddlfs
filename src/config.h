@@ -6,6 +6,7 @@
 struct s_global_config {
     char *mountpoint;
     char *temppath;
+    char *_temppath; 
     char *username;
     char *password;
     char *database;

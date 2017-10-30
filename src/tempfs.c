@@ -6,10 +6,18 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/xattr.h>
+#include <openssl/evp.h>
 
+#include "config.h"
 #include "logging.h"
+/*
+@todo - mkRelease.sh should add following to requirements: 
+$ sudo apt-get install libssl-dev
+$ sudo yum install openssl-devel
+*/
 
 /**
  * determine meta file name (meta_fn) for specified cache file name (cache_fn).
@@ -170,4 +178,88 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
     
     logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is outdated.", cache_fn);
     return EXIT_FAILURE;
+}
+
+/*
+static unsigned int hash(const char *mode, const char* dataToHash, size_t dataSize, unsigned char* outHashed) {
+    unsigned int md_len = -1;
+    const EVP_MD *md = EVP_get_digestbyname(mode);
+    if(NULL != md) {
+        EVP_MD_CTX mdctx;
+        EVP_MD_CTX_init(&mdctx);
+        EVP_DigestInit_ex(&mdctx, md, NULL);
+        EVP_DigestUpdate(&mdctx, dataToHash, dataSize);
+        EVP_DigestFinal_ex(&mdctx, outHashed, &md_len);
+        EVP_MD_CTX_cleanup(&mdctx);
+    }
+    return md_len;
+}*/
+
+int tfs_mkdir() {
+    unsigned char hash[20];
+     
+    // Initialize OpenSSL SHA1 digest
+    unsigned int md_len = -1; 
+    OpenSSL_add_all_algorithms();
+
+    const EVP_MD *md = EVP_get_digestbyname("SHA1");
+    if (md == NULL) {
+        logmsg(LOG_DEBUG, "tfs_mkdir - unable to obtain SHA1 digest.");
+        return EXIT_FAILURE;
+    }
+
+    EVP_MD_CTX mdctx;
+    EVP_MD_CTX_init(&mdctx);
+    EVP_DigestInit_ex(&mdctx, md, NULL);
+
+    // Calculate SHA1 based on g_conf parameters (only those params that uniquely identify this mountpoint)
+    if (EVP_DigestUpdate(&mdctx, g_conf.username, strlen(g_conf.username)) != 1) {
+        logmsg(LOG_DEBUG, "tfs_mkdir - unable to update SHA1 for username");
+        return EXIT_FAILURE;
+    }
+    
+
+    // Finalize SHA1 calculation
+    if (EVP_DigestFinal_ex(&mdctx, hash, &md_len) != 1) {
+        logmsg(LOG_DEBUG, "tfs_mkdir - unable to finalize SHA1.");
+        return EXIT_FAILURE;
+    }
+
+    EVP_MD_CTX_cleanup(&mdctx); 
+   
+    // assemble actual temppath (by appending the hash to the g_conf.temppath) 
+    g_conf._temppath = calloc(strlen(g_conf.temppath)+100, sizeof(char)); // @todo - 100 is estimate (actual=40+strlen("/ddlfs-"))
+    strcpy(g_conf._temppath, g_conf.temppath);
+    strcat(g_conf._temppath, "/ddlfs-");
+
+    int tlen = strlen(g_conf._temppath);
+    int j = 0;
+    for (int i = 0; i < 20; i++) {
+        char tchr[2];
+        sprintf(tchr, "%x", (unsigned int) hash[i]);
+
+        g_conf._temppath[tlen+j] = tchr[0];
+        g_conf._temppath[tlen+j+1] = tchr[1];
+
+        j+= 2;
+    }
+    
+    // create or reuse directory
+    struct stat st;
+    if (stat(g_conf._temppath, &st) == -1) {
+        if (errno == ENOENT) {
+            if (mkdir(g_conf._temppath, 0700) != 0) {
+                logmsg(LOG_ERROR, "tfs_mkdir - unable to create temporary directory [%s]: %d - %s", g_conf._temppath, errno, strerror(errno));
+                return EXIT_FAILURE;
+            }
+            logmsg(LOG_DEBUG, "tfs_mkdir - created temporary directory: [%s]", g_conf._temppath);
+        } else {
+            logmsg(LOG_ERROR, "tfs_mkdir - unable to check if temporary directory [%s] exists. %d - %s", g_conf._temppath, errno, strerror(errno));
+            return EXIT_FAILURE;
+        }
+    } else {
+        logmsg(LOG_DEBUG, "tfs_mkdir - reused temporary directory: [%s]", g_conf._temppath); 
+    }
+     
+    return EXIT_SUCCESS;
 }

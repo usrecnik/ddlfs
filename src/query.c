@@ -85,8 +85,8 @@ int qry_object_fname(const char *schema,
         logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", PATH_MAX);
         return EXIT_FAILURE;
     }
-    snprintf(*fname, PATH_MAX, "%s/ddlfs-%d-%s.%s.%s.tmp", 
-        g_conf.temppath, getpid(), schema, type, object);
+    snprintf(*fname, PATH_MAX, "%s/ddlfs-%s.%s.%s.tmp", 
+        g_conf._temppath, schema, type, object);
     return EXIT_SUCCESS;
 }
 
@@ -276,7 +276,7 @@ and o.owner=:bind_schema";
     
     if (g_conf.filesize == -1) {
         if (tfs_validate(fname, o_sel, last_ddl_time) == EXIT_SUCCESS) {
-            logmsg(LOG_DEBUG, "qry_object_dbms_metadata - tempfile [%s] is up2date.");
+            // logmsg(LOG_DEBUG, "qry_object_dbms_metadata - tempfile [%s] is up2date.");
             goto qry_object_dbms_metadata_cleanup; // this is a bit ugly, but it's short and it works :)
         }
     }
@@ -471,7 +471,7 @@ order by s.\"LINE\"";
         if (first) {
             if (g_conf.filesize == -1) {
                 if (tfs_validate(fname, o_sl2, last_ddl_time) == EXIT_SUCCESS) {
-                    logmsg(LOG_DEBUG, "qry_object_all_source - tempfile [%s] is up2date.");
+                    // logmsg(LOG_DEBUG, "qry_object_all_source - tempfile [%s] is up2date.");
                     break;
                 }
             }
@@ -637,7 +637,7 @@ int qry_object(char *schema,
         logmsg(LOG_ERROR, "qry_object() - unable to set last_ddl_time on [%s], caching won't work (= disabled)", *fname);
         // this is not a fatal error - it should only have impact on performance, not functionality.
     } else {
-        logmsg(LOG_DEBUG, "qry_object() - set LDT for [%s] to [%d]", *fname, last_ddl_time);
+        // (this si too verbose) logmsg(LOG_DEBUG, "qry_object() - set LDT for [%s] to [%d]", *fname, last_ddl_time);
     }
     
     // cleanup
