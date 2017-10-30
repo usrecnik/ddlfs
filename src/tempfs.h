@@ -40,3 +40,10 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
  * */
 int tfs_mkdir();
 
+
+/**
+ * Remove temporary directory for cached files (cached ddl content).
+ * This is optionally called on umount.
+ * */
+int tfs_rmdir();
+

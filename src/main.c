@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
         return EXIT_SUCCESS;
     }
 
-    g_vfs = vfs_entry_create('D', "/", time(NULL), time(NULL));    
+    g_vfs = vfs_entry_create('D', "/", time(NULL), time(NULL));
     
     logmsg(LOG_INFO, " ");
     logmsg(LOG_INFO, "-> event-loop <-");
@@ -72,7 +72,13 @@ int main(int argc, char *argv[]) {
     logmsg(LOG_INFO, " ");
     logmsg(LOG_INFO, "-> umount <-");
     ora_disconnect();
-
+    
+    if (g_conf.keepcache == 0) {
+        if (tfs_rmdir(0) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "Unable to remove cache directory after mount (config keepcache=0).");
+        }
+    }
+    
     return r;
 }
 

@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/xattr.h>
+#include <dirent.h>
 #include <openssl/evp.h>
 
 #include "config.h"
@@ -180,22 +181,59 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
     return EXIT_FAILURE;
 }
 
-/*
-static unsigned int hash(const char *mode, const char* dataToHash, size_t dataSize, unsigned char* outHashed) {
-    unsigned int md_len = -1;
-    const EVP_MD *md = EVP_get_digestbyname(mode);
-    if(NULL != md) {
-        EVP_MD_CTX mdctx;
-        EVP_MD_CTX_init(&mdctx);
-        EVP_DigestInit_ex(&mdctx, md, NULL);
-        EVP_DigestUpdate(&mdctx, dataToHash, dataSize);
-        EVP_DigestFinal_ex(&mdctx, outHashed, &md_len);
-        EVP_MD_CTX_cleanup(&mdctx);
+// return 1 if haystack ends with suffix and 0 otherwise.
+static int tfs_strend(const char *haystack, const char *suffix) {
+    if (strlen(haystack) <= strlen(suffix))
+        return 0;
+    
+    if (strcmp(haystack + strlen(haystack) + strlen(haystack) - strlen(suffix), suffix))
+        return 1;
+    
+    return 0;
+}
+
+int tfs_rmdir(int ignoreNoDir) {
+    
+    // remove files in directory
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir (g_conf._temppath)) == NULL) {
+        if (ignoreNoDir != 1 || errno != ENOENT)
+            logmsg(LOG_ERROR, "tfs_rmdir - unable to open directory (%d): %d - %s", g_conf._temppath, errno, strerror(errno));
+        return EXIT_FAILURE;
     }
-    return md_len;
-}*/
+    
+    char temppath[8192];
+    while ((ent = readdir (dir)) != NULL) {
+        if (strlen(g_conf._temppath) + strlen(ent->d_name) > 8190) {
+            logmsg(LOG_ERROR, "tfs_rmdir - unable to remove file because name too long (8k) [%s]", ent->d_name);
+            continue;
+        }
+        strcpy(temppath, g_conf._temppath);
+        strcat(temppath, "/");
+        strcat(temppath, ent->d_name);
+ 
+        if ( (tfs_strend(ent->d_name, ".tmp")) || (tfs_strend(ent->d_name, ".dfs")) ) {
+            if (unlink(temppath) != 0) {
+                logmsg(LOG_ERROR, "tfs_rmdir - unable to delete file [%s]: %d - %s", temppath, errno, strerror(errno));
+                continue;
+            }
+        }
+    }
+
+    closedir(dir);
+
+    // remove empty directory
+    if (rmdir(g_conf._temppath) != 0) {
+        logmsg(LOG_ERROR, "tfs_rmdir - unable to delete directory (%s): %d - %s", g_conf._temppath, errno, strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
 
 int tfs_mkdir() {
+    char lowerconf[5];
     unsigned char hash[20];
      
     // Initialize OpenSSL SHA1 digest
@@ -214,10 +252,25 @@ int tfs_mkdir() {
 
     // Calculate SHA1 based on g_conf parameters (only those params that uniquely identify this mountpoint)
     if (EVP_DigestUpdate(&mdctx, g_conf.username, strlen(g_conf.username)) != 1) {
-        logmsg(LOG_DEBUG, "tfs_mkdir - unable to update SHA1 for username");
+        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for username");
+        return EXIT_FAILURE;
+    }
+
+    if (EVP_DigestUpdate(&mdctx, g_conf.database, strlen(g_conf.database)) != 1) {
+        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for database");
+        return EXIT_FAILURE;
+    }
+
+    if (EVP_DigestUpdate(&mdctx, g_conf.schemas, strlen(g_conf.schemas)) != 1) {
+        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for schemas");
         return EXIT_FAILURE;
     }
     
+    sprintf(lowerconf, "%d", g_conf.lowercase);
+    if (EVP_DigestUpdate(&mdctx, lowerconf, strlen(lowerconf)) != 1) {
+        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for lowercase");
+        return EXIT_FAILURE;
+    }
 
     // Finalize SHA1 calculation
     if (EVP_DigestFinal_ex(&mdctx, hash, &md_len) != 1) {
@@ -243,7 +296,11 @@ int tfs_mkdir() {
 
         j+= 2;
     }
-    
+
+    // (optionally) delete existing directory
+    if (g_conf.keepcache == 0)
+        tfs_rmdir(1);
+
     // create or reuse directory
     struct stat st;
     if (stat(g_conf._temppath, &st) == -1) {
@@ -263,3 +320,5 @@ int tfs_mkdir() {
      
     return EXIT_SUCCESS;
 }
+
+

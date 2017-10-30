@@ -11,6 +11,7 @@ struct s_global_config {
     char *password;
     char *database;
     char *schemas;
+    int   keepcache;
     int   lowercase;
     int   filesize;
     char *loglevel;

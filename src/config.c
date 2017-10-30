@@ -22,7 +22,9 @@ static struct fuse_opt ddlfs_opts[] = {
     MYFS_OPT("filesize=%d", filesize, 1),
     MYFS_OPT("lowercase",   lowercase, 1),
     MYFS_OPT("nolowercase", lowercase, 0),
-        
+    MYFS_OPT("keepcache",   keepcache, 1),
+    MYFS_OPT("nokeepcache", keepcache, 0),
+      
     FUSE_OPT_KEY("-h",      KEY_HELP),
     FUSE_OPT_KEY("--help",  KEY_HELP),
     FUSE_OPT_END
@@ -55,6 +57,8 @@ static int mandatory_parameter(const char *value, const char *parameter) {
 
 struct fuse_args parse_arguments(int argc, char *argv[]) {
 
+    g_conf.keepcache = -1;
+    
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
     fuse_opt_parse(&args, &g_conf, ddlfs_opts, ddlfs_opts_proc);
     
@@ -79,6 +83,9 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     if (g_conf.schemas == NULL)
         g_conf.schemas = g_conf.username;
 
+    if (g_conf.keepcache == -1)
+        g_conf.keepcache = 0;
+
     if (strlen(g_conf.schemas) > 500) {
         logmsg(LOG_ERROR, "Parameter [%s] can have at most 500 characters.");
         args.argc = -1;
@@ -97,6 +104,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     logmsg(LOG_DEBUG, ".. lowercase: [%d]", g_conf.lowercase);
     logmsg(LOG_DEBUG, ".. temppath : [%s]", g_conf.temppath);
     logmsg(LOG_DEBUG, ".. filesize : [%d]", g_conf.filesize);
+    logmsg(LOG_DEBUG, ".. keepcache: [%d]", g_conf.keepcache);
     logmsg(LOG_DEBUG, ".");
     
     return args;
