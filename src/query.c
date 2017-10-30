@@ -288,8 +288,14 @@ and o.owner=:bind_schema";
         goto qry_object_dbms_metadata_cleanup;
     }
 
+    int is_trigger_source = 0;
+    int trg_last_nl_pos = -1;
+    if ( (strcmp(type, "TRIGGER") == 0) || (strcmp(type, "trigger") == 0) )
+        is_trigger_source = 1;
+    
     int first = 1;
     int first_offset = 0;
+    int all_bytes_written = 0;
     while (buf_blen > 0) {
         if (ora_check(
             OCILobRead2(
@@ -339,10 +345,38 @@ and o.owner=:bind_schema";
                 bytes_written, buf_blen);
             goto qry_object_dbms_metadata_cleanup;
         }
-        first=0;
+        
+        if (is_trigger_source) {
+            // find position of last newline in this file, dbms_metadata.get_ddl appends additional alter trigger after it (we need to remove it).
+            char *trgbuf = buf;
+            if (first)
+                trgbuf += first_offset;
+            
+            for (int i = 0; i < bytes_written; i++) {
+                if (trgbuf[i] == '\n') {
+                    trg_last_nl_pos = all_bytes_written + i;
+                }
+            }
+        }
+    
+        first = 0;
+        all_bytes_written += bytes_written;
     }
 
-     
+    // close (implicit flush) the file
+    if (fclose(fp) != 0)
+        logmsg(LOG_ERROR, "qry_object_dbms_metadata() - unable to close FILE*");    
+    fp = NULL;
+    
+    if (is_trigger_source) {
+        // remove last line from cached file (text to remove after last newline should be "ALTER TRIGGER "<OWNER>"."<TRIGGER>" ENABLE")
+        if (truncate(fname, trg_last_nl_pos) != 0) {
+            logmsg(LOG_ERROR, "qry_object_dbms_metadata - unable to truncate [%s]: %d - %s", fname, errno, strerror(errno));
+            retval = EXIT_FAILURE;
+        }
+    }
+
+    
 qry_object_dbms_metadata_cleanup:
 
     if (buf != NULL)
@@ -532,7 +566,7 @@ order by s.\"LINE\"";
 
         first=0;
     }
-    
+
      
 qry_object_all_source_cleanup:
 
@@ -612,7 +646,8 @@ int qry_object(char *schema,
     
     
     // actuall call correct implementation:
-    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0))
+    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0) || 
+        (strcmp(type, "TRIGGER") == 0) || (strcmp(type, "trigger") == 0) )
         // because only dbms_metadata supports getting source of VIEW objects 
         retval = qry_object_dbms_metadata(object_schema, object_type, object_name, *fname, is_java_source, &last_ddl_time);
     else if ((strcmp(type, "JAVA_SOURCE") == 0) || (strcmp(type, "java_source") == 0))
@@ -787,6 +822,7 @@ int qry_types(t_fsentry *schema) {
         "package_body",
         "package_spec",
         "procedure",
+        "trigger",
         "type",
         "type_body",
         "view",
