@@ -182,6 +182,7 @@ static int qry_object_dbms_metadata(const char *schema,
                                     const char *object,                                   
                                     const char *fname,
                                     const int is_java_source,
+                                    const int is_trigger_source,
                                           time_t *last_ddl_time) {
     
     int retval = EXIT_SUCCESS;
@@ -288,11 +289,7 @@ and o.owner=:bind_schema";
         goto qry_object_dbms_metadata_cleanup;
     }
 
-    int is_trigger_source = 0;
-    int trg_last_nl_pos = -1;
-    if ( (strcmp(type, "TRIGGER") == 0) || (strcmp(type, "trigger") == 0) )
-        is_trigger_source = 1;
-    
+    int trg_last_nl_pos = -1; 
     int first = 1;
     int first_offset = 0;
     int all_bytes_written = 0;
@@ -402,6 +399,7 @@ static int qry_object_all_source(const char *schema,
                                  const char *object,
                                  const char *fname,
                                  const  int is_java_source,
+                                 const  int is_trigger_source,
                                      time_t *last_ddl_time) {
     
     int retval = EXIT_SUCCESS;
@@ -518,12 +516,18 @@ order by s.\"LINE\"";
             }
 
             if (!is_java_source) {
+                // @todo - check if 'EDITIONABLE' keyword is needed
                 sprintf(tmpstr, "CREATE OR REPLACE %s \"%s\".", type, schema);
                 fwrite(tmpstr, 1, strlen(tmpstr), fp);
             }
         }
-        
-        if (!is_java_source && first) {
+     
+        if (is_trigger_source && first) {
+            // @todo - replace everything before 'BEFORE', 'AFTER', 'INSTEAD' with:
+            // 'create or replace <editionable> trigger "<owner>"."<trigger-name>" '
+        }
+   
+        if (!is_java_source && !is_trigger_source && first) {
             // replace multiple spaces with single space
             org = o_sl1;
             tmp = o_sl1;
@@ -599,6 +603,7 @@ int qry_object(char *schema,
     char *object_type = NULL;
     char *object_name = NULL;
     int is_java_source = 0;
+    int is_trigger_source = 0;
     struct utimbuf newtime;
     time_t last_ddl_time = 0;
         
@@ -643,19 +648,18 @@ int qry_object(char *schema,
     }
     
     is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
-    
+    is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
     
     // actuall call correct implementation:
-    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0) || 
-        (strcmp(type, "TRIGGER") == 0) || (strcmp(type, "trigger") == 0) )
+    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0) || is_trigger_source)
         // because only dbms_metadata supports getting source of VIEW objects 
-        retval = qry_object_dbms_metadata(object_schema, object_type, object_name, *fname, is_java_source, &last_ddl_time);
-    else if ((strcmp(type, "JAVA_SOURCE") == 0) || (strcmp(type, "java_source") == 0))
+        retval = qry_object_dbms_metadata(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
+    else if (is_java_source)
         // because dbms_metadata strips all newlines from java source and is thus unusable for this purpose
-        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, &last_ddl_time);
+        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
     else
         // either implementation could be used, but all_source should be slightly faster
-        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, &last_ddl_time);
+        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source,  &last_ddl_time);
     
     // set standard file attributes on cached file (atime & mtime)
     newtime.actime = time(NULL);
