@@ -76,8 +76,10 @@ t_fsentry* _vfs_search(t_fsentry *entry, const char *fname, int min, int max, in
         return NULL; // no entries
 
     int pos = (min == max ? min : min + (max-min)/2);
-    if (depth > 10)
+    if (depth > 1000) {
+        logmsg(LOG_ERROR, "vfs_search(), entered recursion more than 1000 times, something probably went wrong!");
         return NULL;
+    }
     
     int cmp = strcmp(entry->children[pos]->fname, fname);
     if (cmp == 0)
