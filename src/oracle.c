@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "logging.h"
+#include "config.h"
 #include "oracle.h"
 
 sword ora_check(sword status) {
@@ -53,8 +54,26 @@ sword ora_check(sword status) {
 
 int ora_connect(char* username, char* password, char* database) {
     sword r;
+
+    // https://docs.oracle.com/cd/E11882_01/appdev.112/e10646/oci16rel001.htm#LNOCI17121
+    ub4 auth_type = OCI_CRED_RDBMS;
+    ub4 user_role = OCI_DEFAULT;
+
+    if (strncmp(username, "/", 1) == 0)
+        auth_type = OCI_CRED_EXT;
+
+    if (g_conf.userrole != NULL && strcmp(g_conf.userrole, "SYSDBA") == 0)
+        user_role = OCI_SYSDBA;
+
+    if (g_conf.userrole != NULL && strcmp(g_conf.userrole, "SYSOPER") == 0)
+        user_role = OCI_SYSOPER;
     
-    logmsg(LOG_INFO, "Connecting to Oracle Database (%s).", database);
+    
+    logmsg(LOG_INFO, "Connecting to Oracle Database (%s)", database);
+    
+    if (auth_type == OCI_CRED_EXT)
+        logmsg(LOG_INFO, ".. using external authentiaction.");
+
     r = OCIEnvCreate(&g_connection.env, OCI_DEFAULT, 0, 0, 0, 0, 0, 0);
     if (ora_check(r) != OCI_SUCCESS)
         return EXIT_FAILURE;
@@ -64,31 +83,44 @@ int ora_connect(char* username, char* password, char* database) {
     OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.srv, OCI_HTYPE_SERVER,  0, 0);
     OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.svc, OCI_HTYPE_SVCCTX,  0, 0);
     OCIHandleAlloc(g_connection.env, (dvoid**)&g_connection.ses, OCI_HTYPE_SESSION, 0, 0);
-        
-    logmsg(LOG_DEBUG, ".. attaching to server process.");
-    r = OCIServerAttach(
-        g_connection.srv, 
-        g_connection.err, 
-        (text*) database, 
-        strlen(database), 
-        (ub4) OCI_DEFAULT);
-
+    
+    if (strcmp(g_conf.database, "/") == 0) {
+        logmsg(LOG_DEBUG, ".. attaching to server process to *DEFAULT* host.");
+        if (auth_type == OCI_CRED_EXT)
+            r = OCIServerAttach(
+                g_connection.srv,
+                g_connection.err,
+                NULL,
+                0,
+                (ub4) OCI_DEFAULT);
+    } else {
+        logmsg(LOG_DEBUG, ".. attaching server process.");
+        r = OCIServerAttach(
+            g_connection.srv, 
+            g_connection.err, 
+            (text*) database, 
+            strlen(database),
+            (ub4) OCI_DEFAULT);
+    }
+    
     if (ora_check(r))
         return EXIT_FAILURE;
     
-    logmsg(LOG_DEBUG, ".. setting session attributes (user=%s).", username);
+    logmsg(LOG_DEBUG, ".. setting session attributes (username=%s).", username);
     OCIAttrSet(g_connection.svc, OCI_HTYPE_SVCCTX, g_connection.srv, 0, OCI_ATTR_SERVER, g_connection.err);
-    OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, username, strlen(username), OCI_ATTR_USERNAME, g_connection.err); 
-    OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, password, strlen(password), OCI_ATTR_PASSWORD, g_connection.err);
 
-    logmsg(LOG_DEBUG, ".. starting database session.");
-    r = OCISessionBegin (
+    if (auth_type == OCI_CRED_RDBMS) {
+        OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, username, strlen(username), OCI_ATTR_USERNAME, g_connection.err); 
+        OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, password, strlen(password), OCI_ATTR_PASSWORD, g_connection.err);
+    }
+
+    logmsg(LOG_DEBUG, ".. starting [%s] database session.", (g_conf.userrole == NULL ? "default" : g_conf.userrole));
+    if (ora_check(OCISessionBegin (
         g_connection.svc, 
         g_connection.err, 
         g_connection.ses,
-        OCI_CRED_RDBMS, OCI_DEFAULT);
-    if (ora_check(r))
-        return EXIT_FAILURE;
+        auth_type, user_role)))
+            return EXIT_FAILURE;
 
     logmsg(LOG_DEBUG, ".. registering database session.");
     OCIAttrSet(g_connection.svc, OCI_HTYPE_SVCCTX, g_connection.ses, 0, OCI_ATTR_SESSION, g_connection.err);

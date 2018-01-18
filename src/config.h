@@ -9,6 +9,7 @@ struct s_global_config {
     char *_temppath; 
     char *username;
     char *password;
+    char *userrole;
     char *database;
     char *schemas;
     int   keepcache;

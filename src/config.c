@@ -17,6 +17,7 @@ static struct fuse_opt ddlfs_opts[] = {
     MYFS_OPT("password=%s", password, 1),
     MYFS_OPT("database=%s", database, 1),
     MYFS_OPT("schemas=%s",  schemas,  1),
+    MYFS_OPT("userrole=%s", userrole, 1),
     MYFS_OPT("loglevel=%s", loglevel, 1),
     MYFS_OPT("temppath=%s", temppath, 1),
     MYFS_OPT("filesize=%d", filesize, 1),
@@ -86,8 +87,16 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     if (g_conf.keepcache == -1)
         g_conf.keepcache = 0;
 
+    if (g_conf.userrole != NULL) {
+        if (strcmp(g_conf.userrole, "SYSDBA") != 0 && strcmp(g_conf.userrole, "SYSOPER") != 0) {
+            logmsg(LOG_ERROR, "Parameter userrole can only have the value of 'SYSDBA' or 'SYSOPER' if it is set.");
+            args.argc = -1;
+            return args;
+        }
+    }
+     
     if (strlen(g_conf.schemas) > 500) {
-        logmsg(LOG_ERROR, "Parameter [%s] can have at most 500 characters.");
+        logmsg(LOG_ERROR, "Parameter 'schemas' can have at most 500 characters.");
         args.argc = -1;
         return args;
     }
@@ -101,6 +110,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     logmsg(LOG_DEBUG, ".. database : [%s]", g_conf.database);
     logmsg(LOG_DEBUG, ".. loglevel : [%s]", g_conf.loglevel);
     logmsg(LOG_DEBUG, ".. schemas  : [%s]", g_conf.schemas);
+    logmsg(LOG_DEBUG, ".. userrole : [%s]", g_conf.userrole);
     logmsg(LOG_DEBUG, ".. lowercase: [%d]", g_conf.lowercase);
     logmsg(LOG_DEBUG, ".. temppath : [%s]", g_conf.temppath);
     logmsg(LOG_DEBUG, ".. filesize : [%d]", g_conf.filesize);
