@@ -993,7 +993,8 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
     }
     vfs_entry_sort(type);
 
-    qry_objects_filesize(schema, type);
+    if (g_conf.filesize == -1)
+        qry_objects_filesize(schema, type);
 
 qry_objects_cleanup:
 
