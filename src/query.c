@@ -884,6 +884,9 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
     char *schema_name = strdup(schema->fname);
     char *type_name = strdup(type->fname);
     char *suffix = NULL;
+    int is_schema_sys = 0;
+    int is_type_type = 0;
+    
     if (type_name == NULL || schema_name == NULL) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to strdup type_name and/or schema_name");
         if (type_name != NULL)
@@ -896,7 +899,13 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
         str_upper(schema_name);
         str_upper(type_name);
     }
+    
+    if (strcmp(schema_name, "SYS") == 0) 
+        is_schema_sys = 1;
 
+    if (strcmp(type_name, "TYPE") == 0)
+        is_type_type = 1;
+     
     if (str_suffix(&suffix, type_name) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to obtain suffix for object type [%s]", type_name);
         if (type_name != NULL)
@@ -928,7 +937,6 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
             return EXIT_FAILURE;
     }
     
-
     if (ora_stmt_prepare(&o_stm, query)) {
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
@@ -960,6 +968,13 @@ from all_objects where owner=:bind_owner and object_type=:bind_type";
     }
 
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+
+        if ((is_schema_sys == 1) && (is_type_type == 1)) {
+            // because SYS.BFILE of type TYPE has no source available.
+            if (strcmp((char*)o_sel[0], "BFILE") == 0)
+                continue;
+        }
+
         memset(temptime, 0, sizeof(struct tm));
         char* xx = strptime(((char*)o_sel[1]), "%Y-%m-%d %H:%M:%S", temptime);
         if (*xx != '\0') {
