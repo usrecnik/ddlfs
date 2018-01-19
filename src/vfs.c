@@ -84,8 +84,9 @@ t_fsentry* _vfs_search(t_fsentry *entry, const char *fname, int min, int max, in
     int cmp = strcmp(entry->children[pos]->fname, fname);
     if (cmp == 0)
         return entry->children[pos];
-    
-    if (min == max)
+
+    if (min == max || min == max-1)    
+//    if (min == max)
         return NULL;
     
     if (cmp < 0)
