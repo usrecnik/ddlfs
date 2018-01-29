@@ -7,6 +7,9 @@
 #include "config.h"
 #include "oracle.h"
 
+#define MAJOR_NUMVSN(v) ((sword)(((v) >> 24) & 0x000000FF))      /* version number */ 
+#define MINOR_NUMRLS(v) ((sword)(((v) >> 20) & 0x0000000F))      /* release number */
+
 sword ora_check(sword status) {
     text errbuf[512];
     sb4 errcode;
@@ -124,6 +127,19 @@ int ora_connect(char* username, char* password, char* database) {
 
     logmsg(LOG_DEBUG, ".. registering database session.");
     OCIAttrSet(g_connection.svc, OCI_HTYPE_SVCCTX, g_connection.ses, 0, OCI_ATTR_SESSION, g_connection.err);
+
+    logmsg(LOG_DEBUG, ".. determining database version.");
+    char version_str[20] = "";
+    ub4 version_int = 0;
+    if (ora_check(OCIServerRelease( g_connection.svc, g_connection.err,  
+                         (OraText*) version_str, 20, OCI_HTYPE_SVCCTX, 
+                         &version_int)))
+        return EXIT_FAILURE;
+    
+    int major = MAJOR_NUMVSN(version_int);
+    int minor = MINOR_NUMRLS(version_int);
+    g_conf._server_version = major*100+minor;
+    logmsg(LOG_INFO, ".. connected to server version [%s] [%d]", version_str, g_conf._server_version);
 
     logmsg(LOG_INFO, ".. connected.");
     return EXIT_SUCCESS;

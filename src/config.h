@@ -16,6 +16,7 @@ struct s_global_config {
     int   lowercase;
     int   filesize;
     char *loglevel;
+    int   _server_version;
 } g_conf;
 
 
