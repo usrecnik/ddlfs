@@ -515,7 +515,7 @@ order by s.\"LINE\"";
                 goto qry_object_all_source_cleanup;
             }
 
-            if (!is_java_source) {
+            if (!is_java_source && !is_trigger_source) {
                 // @todo - check if 'EDITIONABLE' keyword is needed
                 sprintf(tmpstr, "CREATE OR REPLACE %s \"%s\".", type, schema);
                 fwrite(tmpstr, 1, strlen(tmpstr), fp);
@@ -523,10 +523,56 @@ order by s.\"LINE\"";
         }
      
         if (is_trigger_source && first) {
-            // @todo - replace everything before 'BEFORE', 'AFTER', 'INSTEAD' with:
+            sprintf(tmpstr, "CREATE OR REPLACE %s \"%s\".\"%s\" ", type, schema, object);
+            fwrite(tmpstr, 1, strlen(tmpstr), fp);
+             
+            // replace everything before 'BEFORE', 'AFTER', 'INSTEAD' with:
             // 'create or replace <editionable> trigger "<owner>"."<trigger-name>" '
+            char *kw_all[3] = {"BEFORE", "AFTER", "INSTEAD"};
+            char *kw_which = NULL; // which keyword out of kw_all was found, one of the 3 strings in kw_all 
+            char *kw_found = NULL; // return value form strcasestr, where did we found the kw_which
+            char *kw_after = NULL; // char after keyword (it must be whitespace char, otherwise we found something that is not really a keyword)
+            char *kw_before = NULL; 
+            int line = 1;
+            while (kw_found == NULL) {
+                for (int i = 0; i < 3; i++) {
+                    kw_found = strcasestr(o_sl1, kw_all[i]);
+                    if (kw_found != NULL) {
+                        kw_which = kw_all[i];
+                        kw_after = kw_found + strlen(kw_which);
+                        kw_before = (kw_found == o_sl1 ? NULL : kw_found - 1);
+
+                        if ((kw_after[0] != ' ' && kw_after[0] != '\n' && kw_after[0] != '\r' && kw_after[0] != '\t') || 
+                            (kw_before != NULL && kw_before[0] != ' ' && kw_before[0] != '\n' && kw_before[0] != '\r' && kw_before[0] != '\t')) {
+                            // so, this is not really a keyword
+                            kw_which = NULL;
+                            kw_after = NULL;
+                            kw_before = NULL;
+                            kw_found = NULL;
+                        }
+                    }
+                    if (kw_found != NULL)
+                        break;
+                }
+
+                if (kw_found == NULL) {
+                    // none of 3 keywords was found on this line, fetch next line
+                    ora_stmt_fetch(o_stm);
+                    line++;
+                }
+            }
+            if (kw_found == NULL) {
+                logmsg(LOG_ERROR, "qry_object_all_source: Unable to find keyword for trigger [%s][%s]", schema, object);
+                if (o_sl1 != NULL) // very unlikely case, let's do our best here (even though probably a bit off):
+                    fwrite(o_sl1, 1, strlen(o_sl1), fp);
+            } else {
+                fwrite(kw_found, 1, strlen(kw_found), fp);
+            }
+
+            first=0;
+            continue;
         }
-   
+         
         if (!is_java_source && !is_trigger_source && first) {
             // replace multiple spaces with single space
             org = o_sl1;
@@ -651,7 +697,7 @@ int qry_object(char *schema,
     is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
     
     // actuall call correct implementation:
-    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0) || is_trigger_source)
+    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0))
         // because only dbms_metadata supports getting source of VIEW objects 
         retval = qry_object_dbms_metadata(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
     else if (is_java_source)
