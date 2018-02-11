@@ -186,14 +186,7 @@ static int qry_object_dbms_metadata(const char *schema,
                                           time_t *last_ddl_time) {
     
     int retval = EXIT_SUCCESS;
-    char *query = NULL;
-    if (g_conf.filesize != -1)
-        query = 
-"select dbms_metadata.get_ddl(\
-:bind_type, :bind_object, :bind_schema) \
-as retval from dual";
-    else
-        query = 
+    char *query = 
 "select \
 dbms_metadata.get_ddl(o.object_type, o.object_name, o.owner), \
 to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') \
@@ -225,14 +218,12 @@ and o.owner=:bind_schema";
         goto qry_object_dbms_metadata_cleanup;
     }
 
-    if (g_conf.filesize == -1) {
-        if ((o_sel = malloc(30*sizeof(char))) == NULL) {
-            logmsg(LOG_ERROR, "qry_object_dbms_metadata - Unable to allocate memory for o_sel.");
-            retval = EXIT_FAILURE;
-            goto qry_object_dbms_metadata_cleanup;
-        }
+    if ((o_sel = malloc(30*sizeof(char))) == NULL) {
+        logmsg(LOG_ERROR, "qry_object_dbms_metadata - Unable to allocate memory for o_sel.");
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
     }
-   
+    
     if (ora_lob_alloc(&o_lob)) {
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
@@ -248,11 +239,9 @@ and o.owner=:bind_schema";
         goto qry_object_dbms_metadata_cleanup;
     }
 
-    if (g_conf.filesize == -1) {
-        if (ora_stmt_define_i(o_stm, &o_def, 2, o_sel, 30*sizeof(char), SQLT_STR, (dvoid*) &o_sel_i)) {
-            retval = EXIT_FAILURE;
-            goto qry_object_dbms_metadata_cleanup;
-        }
+    if (ora_stmt_define_i(o_stm, &o_def, 2, o_sel, 30*sizeof(char), SQLT_STR, (dvoid*) &o_sel_i)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_dbms_metadata_cleanup;
     }
 
     if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
@@ -275,11 +264,9 @@ and o.owner=:bind_schema";
         goto qry_object_dbms_metadata_cleanup;
     }
     
-    if (g_conf.filesize == -1) {
-        if (tfs_validate(fname, o_sel, last_ddl_time) == EXIT_SUCCESS) {
-            // logmsg(LOG_DEBUG, "qry_object_dbms_metadata - tempfile [%s] is up2date.");
-            goto qry_object_dbms_metadata_cleanup; // this is a bit ugly, but it's short and it works :)
-        }
+    if (tfs_validate(fname, o_sel, last_ddl_time) == EXIT_SUCCESS) {
+        // logmsg(LOG_DEBUG, "qry_object_dbms_metadata - tempfile [%s] is up2date.");
+        goto qry_object_dbms_metadata_cleanup; // this is a bit ugly, but it's short and it works :)
     }
     
     fp = fopen(fname, "w");
@@ -404,15 +391,21 @@ static int qry_object_all_source(const char *schema,
     
     int retval = EXIT_SUCCESS;
     char *query = NULL;
-    if (g_conf.filesize != -1)
-        query = // select on all_source view only
-"select nvl(\"TEXT\", '\n') from all_source \
-where \"TYPE\"=:bind_type and \"NAME\"=:bind_object and \"OWNER\"=:bind_schema \
-order by \"LINE\"";
-    else {
-        query = // join all_objects to obtain last_ddl_time in first returned row
+
+    if (g_conf._server_version <= 112) {
+        query = 
 "select nvl(s.\"TEXT\", '\n') as s, \
-case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t \
+case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t, \
+null as e \
+from all_source s \
+join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
+where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
+order by s.\"LINE\"";
+    } else {
+        query =
+"select nvl(s.\"TEXT\", '\n') as s, \
+case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t, \
+case when rownum = 1 then \"EDITIONABLE\" else null end as e \
 from all_source s \
 join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
 where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
@@ -422,9 +415,11 @@ order by s.\"LINE\"";
     
     OCIStmt       *o_stm = NULL; // free
     OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
-    char          *o_sl1 = NULL; // renamed from o_sel
-    char          *o_sl2 = NULL;
+    char          *o_sl1 = NULL; // 'line'
+    char          *o_sl2 = NULL; // 'last_ddl_time'
+    char          *o_sl3 = NULL; // 'editionable'
     sb2            o_sl2i = 0;   // null indicator for o_sl2
+    sb2            o_sl3i = 0;   // null indicator for o_sl3
     OCIBind       *o_bn1 = NULL; // The bind handles are freed implicitly when 
     OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
     OCIBind       *o_bn3 = NULL;
@@ -438,36 +433,41 @@ order by s.\"LINE\"";
         return EXIT_FAILURE;
     }
 
+    if ((o_sl2 = malloc(30*sizeof(char))) == NULL) {
+        logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sl2.");
+        return EXIT_FAILURE;
+    }
+
+    if ((o_sl3 = malloc(2*sizeof(char))) == NULL) {
+        logmsg(LOG_ERROR, "qry_objec_all_source() - Unable to allocate memory for o_sl3.");
+        return EXIT_FAILURE;
+    }
+
     if ((tmpstr = malloc(4096*sizeof(char))) == NULL) {
         logmsg(LOG_ERROR, "qry_object_all_source - unable to allocate memory for tmpstr.");
         free(o_sl1);
         return EXIT_FAILURE;
     }
-    
-    if (g_conf.filesize == -1) {
-        if ((o_sl2 = malloc(30*sizeof(char))) == NULL) {
-            logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sl2.");
-            return EXIT_FAILURE;
-        }
-    }
-
-    
+ 
     // query 
     if (ora_stmt_prepare(&o_stm, query)) {
         retval = EXIT_FAILURE;
         goto qry_object_all_source_cleanup;
     }
-      
+     
     if (ora_stmt_define(o_stm, &o_def, 1, o_sl1, 4096*sizeof(char), SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_object_all_source_cleanup;
     }
     
-    if (g_conf.filesize == -1) {
-        if (ora_stmt_define_i(o_stm, &o_def, 2, o_sl2, 30*sizeof(char), SQLT_STR, &o_sl2i)) {
-            retval = EXIT_FAILURE;
-            goto qry_object_all_source_cleanup;
-        }
+    if (ora_stmt_define_i(o_stm, &o_def, 2, o_sl2, 30*sizeof(char), SQLT_STR, &o_sl2i)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 3, o_sl3, 2*sizeof(char), SQLT_STR, &o_sl3i)) {
+        retval = EXIT_FAILURE;
+        goto qry_object_all_source_cleanup;
     }
    
     if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
@@ -494,6 +494,7 @@ order by s.\"LINE\"";
     int type_spaces = 0;
     char *tmp = type;
     char *org = NULL;
+    char editionable[30] = "";
 
     for(; *tmp != '\0'; tmp++)
         if (*tmp == ' ')
@@ -501,11 +502,18 @@ order by s.\"LINE\"";
 
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
         if (first) {
-            if (g_conf.filesize == -1) {
-                if (tfs_validate(fname, o_sl2, last_ddl_time) == EXIT_SUCCESS) {
-                    // logmsg(LOG_DEBUG, "qry_object_all_source - tempfile [%s] is up2date.");
-                    break;
-                }
+            if (tfs_validate(fname, o_sl2, last_ddl_time) == EXIT_SUCCESS) {
+                // logmsg(LOG_DEBUG, "qry_object_all_source - tempfile [%s] is up2date.");
+                break;
+            }
+             
+            if (o_sl3i >= 0 /* IS NOT NULL */) {
+                if (strcmp(o_sl3, "Y") == 0)
+                    strcpy(editionable, " EDITIONABLE");
+                else
+                    strcpy(editionable, " NONEDITIONABLE");
+            } else {
+                strcpy(editionable, ""); // object cannot be editioned at all (like tables for example)
             }
              
             fp = fopen(fname, "w");
@@ -516,14 +524,13 @@ order by s.\"LINE\"";
             }
 
             if (!is_java_source && !is_trigger_source) {
-                // @todo - check if 'EDITIONABLE' keyword is needed
-                sprintf(tmpstr, "CREATE OR REPLACE %s \"%s\".", type, schema);
+                sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".", editionable, type, schema);
                 fwrite(tmpstr, 1, strlen(tmpstr), fp);
             }
         }
      
         if (is_trigger_source && first) {
-            sprintf(tmpstr, "CREATE OR REPLACE %s \"%s\".\"%s\" ", type, schema, object);
+            sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".\"%s\" ", editionable, type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
              
             // replace everything before 'BEFORE', 'AFTER', 'INSTEAD' with:
