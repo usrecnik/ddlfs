@@ -392,7 +392,7 @@ static int qry_object_all_source(const char *schema,
     int retval = EXIT_SUCCESS;
     char *query = NULL;
 
-    if (g_conf._server_version <= 112) {
+    if (g_conf._server_version <= 1102) {
         query = 
 "select nvl(s.\"TEXT\", '\n') as s, \
 case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t, \
