@@ -233,70 +233,38 @@ int tfs_rmdir(int ignoreNoDir) {
 }
 
 int tfs_mkdir() {
-    char lowerconf[5];
-    unsigned char hash[20];
-     
-    // Initialize OpenSSL SHA1 digest
-    unsigned int md_len = -1; 
-    OpenSSL_add_all_algorithms();
-
-    const EVP_MD *md = EVP_get_digestbyname("SHA1");
-    if (md == NULL) {
-        logmsg(LOG_DEBUG, "tfs_mkdir - unable to obtain SHA1 digest.");
+    
+    g_conf._temppath = calloc(2048, sizeof(char));
+    if (g_conf._temppath == NULL) {
+        logmsg(LOG_ERROR, "tfs_mkdir - unable to calloc memory for temppath");
         return EXIT_FAILURE;
     }
+   
+    snprintf(g_conf._temppath, 2047, "%s/ddlfs-%s.%s.%s.%d",
+        g_conf.temppath,
+        g_conf.database,
+        g_conf.username,
+        g_conf.schemas,
+        g_conf.lowercase);
+    
+    // replace "special" characters
+    for (int i = strlen(g_conf.temppath)+1; i < strlen(g_conf._temppath); i++) {
+        char c = g_conf._temppath[i];
+        if (c >= '0' && c <= '9')
+            continue;
 
-    EVP_MD_CTX mdctx;
-    EVP_MD_CTX_init(&mdctx);
-    EVP_DigestInit_ex(&mdctx, md, NULL);
+        if (c >= 'A' && c <= 'Z')
+            continue;
 
-    // Calculate SHA1 based on g_conf parameters (only those params that uniquely identify this mountpoint)
-    if (EVP_DigestUpdate(&mdctx, g_conf.username, strlen(g_conf.username)) != 1) {
-        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for username");
-        return EXIT_FAILURE;
-    }
+        if (c >= 'a' && c <= 'z')
+            continue;
 
-    if (EVP_DigestUpdate(&mdctx, g_conf.database, strlen(g_conf.database)) != 1) {
-        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for database");
-        return EXIT_FAILURE;
-    }
+        if (c == '.' || c == '_')
+            continue;
 
-    if (EVP_DigestUpdate(&mdctx, g_conf.schemas, strlen(g_conf.schemas)) != 1) {
-        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for schemas");
-        return EXIT_FAILURE;
+        g_conf._temppath[i] = '_';
     }
     
-    sprintf(lowerconf, "%d", g_conf.lowercase);
-    if (EVP_DigestUpdate(&mdctx, lowerconf, strlen(lowerconf)) != 1) {
-        logmsg(LOG_ERROR, "tfs_mkdir - unable to update SHA1 for lowercase");
-        return EXIT_FAILURE;
-    }
-
-    // Finalize SHA1 calculation
-    if (EVP_DigestFinal_ex(&mdctx, hash, &md_len) != 1) {
-        logmsg(LOG_DEBUG, "tfs_mkdir - unable to finalize SHA1.");
-        return EXIT_FAILURE;
-    }
-
-    EVP_MD_CTX_cleanup(&mdctx); 
-   
-    // assemble actual temppath (by appending the hash to the g_conf.temppath) 
-    g_conf._temppath = calloc(strlen(g_conf.temppath)+100, sizeof(char)); // @todo - 100 is estimate (actual=40+strlen("/ddlfs-"))
-    strcpy(g_conf._temppath, g_conf.temppath);
-    strcat(g_conf._temppath, "/ddlfs-");
-
-    int tlen = strlen(g_conf._temppath);
-    int j = 0;
-    for (int i = 0; i < 20; i++) {
-        char tchr[2];
-        sprintf(tchr, "%x", (unsigned int) hash[i]);
-
-        g_conf._temppath[tlen+j] = tchr[0];
-        g_conf._temppath[tlen+j+1] = tchr[1];
-
-        j+= 2;
-    }
-
     // (optionally) delete existing directory
     if (g_conf.keepcache == 0)
         tfs_rmdir(1);
@@ -320,5 +288,4 @@ int tfs_mkdir() {
      
     return EXIT_SUCCESS;
 }
-
 
