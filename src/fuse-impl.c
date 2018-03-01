@@ -387,8 +387,11 @@ int fs_release(const char *path,
             logmsg(LOG_DEBUG, "Read %d bytes", newLen);
             // newLen++;
             buf[newLen+newLenJava] = '\0';
-
-            qry_exec_ddl(object_schema, object_name, buf);
+    
+            if (newLen == 0)
+                logmsg(LOG_DEBUG, "Skipping execution of DDL as input file size is 0.");
+            else 
+                qry_exec_ddl(object_schema, object_name, buf);
             
             if (tfs_rmfile(fname) != EXIT_SUCCESS) {
                 logmsg(LOG_ERROR, "fs_release - unable to remove cache file [%s] after DDL.", fname);
