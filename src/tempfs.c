@@ -240,9 +240,10 @@ int tfs_mkdir() {
         return EXIT_FAILURE;
     }
    
-    snprintf(g_conf._temppath, 2047, "%s/ddlfs-%s.%s.%s.%d",
+    snprintf(g_conf._temppath, 2047, "%s/ddlfs-%s.%s.%s.%s.%d",
         g_conf.temppath,
         g_conf.database,
+        (getenv("ORACLE_SID") == NULL ? "tns" : getenv("ORACLE_SID")),
         g_conf.username,
         g_conf.schemas,
         g_conf.lowercase);
