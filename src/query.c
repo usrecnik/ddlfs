@@ -177,7 +177,7 @@ static int str_fs2oratype(char **fstype) {
     return EXIT_SUCCESS;
 }
 
-static int qry_object_dbms_metadata(const char *schema, 
+/*static int qry_object_dbms_metadata(const char *schema, 
                                     const char *type, 
                                     const char *object,                                   
                                     const char *fname,
@@ -380,6 +380,7 @@ qry_object_dbms_metadata_cleanup:
     
     return retval;
 }
+*/
 
 static int qry_object_all_source(const char *schema, 
                                        char *type,
@@ -388,12 +389,24 @@ static int qry_object_all_source(const char *schema,
                                  const  int is_java_source,
                                  const  int is_trigger_source,
                                      time_t *last_ddl_time) {
-    
+
+    int is_view_source = ((strcmp(type, "VIEW") == 0) ? 1 : 0);
     int retval = EXIT_SUCCESS;
-    char *query = NULL;
+    char query[1024];
 
     if (g_conf._server_version <= 1102) {
-        query = 
+        if (is_view_source) {
+            strcpy(query,
+// 11g ALL_VIEWS
+"select w.text as s, \
+to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
+null as e \
+from all_views w \
+join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type \
+where w.view_name=:bind_object and w.owner=:bind_schema");
+        } else {
+            strcpy(query, 
+// 11g ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s, \
 case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t, \
 null as e \
@@ -401,9 +414,21 @@ from all_source s \
 join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
 and (o.object_type != 'TYPE' or o.subobject_name IS NULL) \
 where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
-order by s.\"LINE\"";
+order by s.\"LINE\"");
+        }
     } else {
-        query =
+        if (is_view_source) {
+            strcpy(query, 
+// 12c ALL_VIEWS
+"select w.text as s, \
+to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
+o.\"EDITIONABLE\" as e \
+from all_views w \
+join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type \
+where w.view_name=:bind_object and w.owner=:bind_schema");
+        } else {
+            strcpy(query, 
+// 12c ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s, \
 case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t, \
 case when rownum = 1 then \"EDITIONABLE\" else null end as e \
@@ -411,9 +436,11 @@ from all_source s \
 join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
 and (o.object_type != 'TYPE' or o.subobject_type IS NULL) \
 where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
-order by s.\"LINE\"";
+order by s.\"LINE\"");
+        }
     }
-    
+     
+    logmsg(LOG_DEBUG, query);
     
     OCIStmt       *o_stm = NULL; // free
     OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
@@ -430,7 +457,8 @@ order by s.\"LINE\"";
     size_t bytes_written;
     FILE *fp = NULL; // free
     
-    if ((o_sl1 = malloc(4096*sizeof(char))) == NULL) {
+    // if ((o_sl1 = malloc(4096*sizeof(char))) == NULL) { // this is enough for varchar2(4000) from all_source, but not for long from all_views.
+    if ((o_sl1 = malloc(4*1024*1024*sizeof(char))) == NULL) {
         logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sl1."); 
         return EXIT_FAILURE;
     }
@@ -457,7 +485,7 @@ order by s.\"LINE\"";
         goto qry_object_all_source_cleanup;
     }
      
-    if (ora_stmt_define(o_stm, &o_def, 1, o_sl1, 4096*sizeof(char), SQLT_STR)) {
+    if (ora_stmt_define(o_stm, &o_def, 1, o_sl1, 4*1024*1024*sizeof(char), SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_object_all_source_cleanup;
     }
@@ -497,7 +525,7 @@ order by s.\"LINE\"";
     char *tmp = type;
     char *org = NULL;
     char editionable[30] = "";
-
+    
     for(; *tmp != '\0'; tmp++)
         if (*tmp == ' ')
             type_spaces++;
@@ -525,13 +553,19 @@ order by s.\"LINE\"";
                 goto qry_object_all_source_cleanup;
             }
 
-            if (!is_java_source && !is_trigger_source) {
+            if (!is_java_source && !is_trigger_source && !is_view_source) {
                 sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".", editionable, type, schema);
                 fwrite(tmpstr, 1, strlen(tmpstr), fp);
             }
+
         }
-     
-        if (is_trigger_source && first) {
+        
+        if (first && is_view_source) {
+            sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
+            fwrite(tmpstr, 1, strlen(tmpstr), fp);
+        }
+        
+        if (first && is_trigger_source) {
             sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".\"%s\" ", editionable, type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
              
@@ -582,7 +616,7 @@ order by s.\"LINE\"";
             continue;
         }
          
-        if (!is_java_source && !is_trigger_source && first) {
+        if (first && !is_view_source && !is_java_source && !is_trigger_source) {
             // replace multiple spaces with single space
             org = o_sl1;
             tmp = o_sl1;
@@ -704,17 +738,8 @@ int qry_object(char *schema,
     
     is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
     is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
-    
-    // actuall call correct implementation:
-    if ((strcmp(type, "VIEW") == 0) || (strcmp(type, "view") == 0))
-        // because only dbms_metadata supports getting source of VIEW objects 
-        retval = qry_object_dbms_metadata(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
-    else if (is_java_source)
-        // because dbms_metadata strips all newlines from java source and is thus unusable for this purpose
-        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
-    else
-        // either implementation could be used, but all_source should be slightly faster
-        retval = qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source,  &last_ddl_time);
+     
+    qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
     
     // set standard file attributes on cached file (atime & mtime)
     newtime.actime = time(NULL);

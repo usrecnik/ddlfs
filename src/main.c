@@ -19,12 +19,14 @@
 #include "vfs.h"
 #include "tempfs.h"
 
+#define DDLFS_VERSION "2.0-RC1"
+
 int main(int argc, char *argv[]) {
     memset(&g_conf, 0, sizeof(g_conf));
     g_conf.loglevel = "DEBUG";
     g_ddl_log_time = time(NULL);
 
-    logmsg(LOG_INFO, "DDL Filesystem for Oracle Database, FUSE v%d.%d", FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
+    logmsg(LOG_INFO, "DDL Filesystem v%s for Oracle Database, FUSE v%d.%d", DDLFS_VERSION, FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
     
     g_conf.mountpoint = realpath(argv[argc-1], NULL);
     logmsg(LOG_DEBUG, ".. mounting at [%s]", g_conf.mountpoint);
