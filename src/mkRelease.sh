@@ -2,7 +2,7 @@
 #
 
 PKG_NAME='ddlfs'
-PKG_VERS='1.0'
+PKG_VERS="$(cat main.c  | grep '#define DDLFS_VERSION' | awk '{print $3}' | tr -d '"' | tr '-' '.')"
 PKG_ARCH='amd64'
 PKG_MAIN='"Urh Srecnik" <urh.srecnik@abakus.si>'
 PKG_DESC='Filesystem which represents Oracle Database objects as their DDL stored in .sql files.'
@@ -88,6 +88,9 @@ function proc_rpm() {
 ###
 # main()
 ###
+
+echo "Building ${PKG_NAME}-${PKG_VERS}"
+echo "--------------------------------"
 
 proc_copy
 proc_deb

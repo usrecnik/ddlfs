@@ -561,7 +561,7 @@ order by s.\"LINE\"");
         }
         
         if (first && is_view_source) {
-            sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
+            sprintf(tmpstr, "CREATE OR REPLACE FORCE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
         }
         
