@@ -21,6 +21,7 @@ static struct fuse_opt ddlfs_opts[] = {
     MYFS_OPT("loglevel=%s", loglevel, 1),
     MYFS_OPT("temppath=%s", temppath, 1),
     MYFS_OPT("filesize=%d", filesize, 1),
+    MYFS_OPT("pdb=%s",      pdb,      1),
     MYFS_OPT("lowercase",   lowercase, 1),
     MYFS_OPT("nolowercase", lowercase, 0),
     MYFS_OPT("keepcache",   keepcache, 1),
@@ -78,8 +79,10 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
         return args;
     }
 
-    if (g_conf.loglevel == NULL)
-        g_conf.loglevel = "INFO";
+    if (g_conf.loglevel == NULL) {
+        g_conf.loglevel = calloc(15, sizeof(char));
+        strcpy(g_conf.loglevel, "INFO");
+    }
 
     if (g_conf.schemas == NULL)
         g_conf.schemas = g_conf.username;
@@ -101,8 +104,10 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
         return args;
     }
     
-    if (g_conf.temppath == NULL)
-        g_conf.temppath = "/tmp";
+    if (g_conf.temppath == NULL) {
+        g_conf.temppath = calloc(10, sizeof(char));
+        strcpy(g_conf.temppath, "/tmp");
+    }
     
     logmsg(LOG_DEBUG, "Parameters:");
     logmsg(LOG_DEBUG, ".. username : [%s]", g_conf.username);
@@ -115,6 +120,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     logmsg(LOG_DEBUG, ".. temppath : [%s]", g_conf.temppath);
     logmsg(LOG_DEBUG, ".. filesize : [%d]", g_conf.filesize);
     logmsg(LOG_DEBUG, ".. keepcache: [%d]", g_conf.keepcache);
+    logmsg(LOG_DEBUG, ".. pdb      : [%s]", g_conf.pdb);
     logmsg(LOG_DEBUG, ".");
     
     return args;

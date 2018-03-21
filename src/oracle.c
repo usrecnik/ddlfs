@@ -141,6 +141,28 @@ int ora_connect(char* username, char* password, char* database) {
     g_conf._server_version = major*100+minor;
     logmsg(LOG_INFO, ".. connected to server version [%s] [%d]", version_str, g_conf._server_version);
 
+
+    if (g_conf.pdb != NULL) {
+        OCIStmt *o_stm = NULL;
+        char alter_session_sql[250];
+        
+        sprintf(alter_session_sql, "alter session set container=%s", g_conf.pdb);
+        logmsg(LOG_INFO, ".. sql: [%s]", alter_session_sql);
+        
+        if (ora_stmt_prepare(&o_stm, alter_session_sql)) {
+            logmsg(LOG_ERROR, "Unable to prepare: [%s]", alter_session_sql);
+            return EXIT_FAILURE;
+        }
+        
+        if (ora_stmt_execute(o_stm, 1)) {
+            logmsg(LOG_ERROR, "Unable to execute: [%s]", alter_session_sql);
+            return EXIT_FAILURE;
+        }
+        
+        if (o_stm != NULL)
+            ora_stmt_free(o_stm);
+    }
+
     logmsg(LOG_INFO, ".. connected.");
     return EXIT_SUCCESS;
 }

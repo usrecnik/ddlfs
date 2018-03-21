@@ -408,7 +408,7 @@ where w.view_name=:bind_object and w.owner=:bind_schema");
             strcpy(query, 
 // 11g ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s, \
-case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t, \
+to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
 null as e \
 from all_source s \
 join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
@@ -430,16 +430,17 @@ where w.view_name=:bind_object and w.owner=:bind_schema");
             strcpy(query, 
 // 12c ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s, \
-case when rownum = 1 then to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') else null end as t, \
-case when rownum = 1 then \"EDITIONABLE\" else null end as e \
+to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
+\"EDITIONABLE\" as e \
 from all_source s \
 join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
-and (o.object_type != 'TYPE' or o.subobject_type IS NULL) \
+and (o.object_type != 'TYPE' or o.subobject_name IS NULL) \
 where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
 order by s.\"LINE\"");
         }
     }
-     
+    
+//    printf("QUERY=[%s]", query);
     logmsg(LOG_DEBUG, query);
     
     OCIStmt       *o_stm = NULL; // free

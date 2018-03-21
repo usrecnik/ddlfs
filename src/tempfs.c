@@ -150,12 +150,11 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
     // convert last_ddl_time to binary format time_t
     memset(temptime, 0, sizeof(struct tm));
     char* xx = strptime((char*) last_ddl_time, "%Y-%m-%d %H:%M:%S", temptime);
-    if (*xx != '\0') {
+    if (xx == NULL || *xx != '\0') {
         logmsg(LOG_ERROR, "tfs_validate - Unable to parse date (%s)", last_ddl_time);
         free(temptime);
         return EXIT_FAILURE;
     }
-    
     *actual_time = timegm(temptime); // last_ddl_time as we got it by querying the datbase (@param last_ddl_time)
     time_t cached_time = 0;           // last_ddl_time as specified in metadata about cached file (@param cache_fn)
     free(temptime);

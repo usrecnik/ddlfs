@@ -12,6 +12,7 @@ struct s_global_config {
     char *userrole;
     char *database;
     char *schemas;
+    char *pdb;
     int   keepcache;
     int   lowercase;
     int   filesize;

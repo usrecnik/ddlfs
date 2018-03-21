@@ -19,7 +19,7 @@
 #include "vfs.h"
 #include "tempfs.h"
 
-#define DDLFS_VERSION "2.0-RC1"
+#define DDLFS_VERSION "2.0-RC2"
 
 int main(int argc, char *argv[]) {
     memset(&g_conf, 0, sizeof(g_conf));
