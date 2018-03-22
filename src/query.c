@@ -448,6 +448,7 @@ order by s.\"LINE\"");
     char          *o_sl1 = NULL; // 'line'
     char          *o_sl2 = NULL; // 'last_ddl_time'
     char          *o_sl3 = NULL; // 'editionable'
+    sb2            o_sl1i = 0;   // null indicator for o_sl1
     sb2            o_sl2i = 0;   // null indicator for o_sl2
     sb2            o_sl3i = 0;   // null indicator for o_sl3
     OCIBind       *o_bn1 = NULL; // The bind handles are freed implicitly when 
@@ -486,7 +487,7 @@ order by s.\"LINE\"");
         goto qry_object_all_source_cleanup;
     }
      
-    if (ora_stmt_define(o_stm, &o_def, 1, o_sl1, 4*1024*1024*sizeof(char), SQLT_STR)) {
+    if (ora_stmt_define_i(o_stm, &o_def, 1, o_sl1, 4*1024*1024*sizeof(char), SQLT_STR, &o_sl1i)) {
         retval = EXIT_FAILURE;
         goto qry_object_all_source_cleanup;
     }
@@ -564,6 +565,15 @@ order by s.\"LINE\"");
         if (first && is_view_source) {
             sprintf(tmpstr, "CREATE OR REPLACE FORCE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
+
+            if (o_sl1i < 0) { // TEXT is null
+                // TEXT (datatype=LONG): View text. This column returns the correct value only when the row originates
+                // from the current container. The BEQUEATH clause will not appear as part of the TEXT column in 
+                // this view.                 
+                strcpy(tmpstr, "   /* this view source is stored in another container */\n   select * from dual");
+                fwrite(tmpstr, 1, strlen(tmpstr), fp);
+                break;
+            }
         }
         
         if (first && is_trigger_source) {
