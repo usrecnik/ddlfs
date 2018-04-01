@@ -1,6 +1,8 @@
+# ddlfs
+[![GitHub release](https://img.shields.io/github/release/usrecnik/ddlfs.svg)](https://github.com/usrecnik/ddlfs/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/usrecnik/ddlfs/blob/master/LICENSE)
 
-**ddlfs** - FUSE filesystem which represents Oracle Database objects as their DDL stored in .sql files.
-
+**FUSE filesystem, which represents Oracle Database objects as their DDL stored in `.SQL` files.**
 
 Installation
 ------------
