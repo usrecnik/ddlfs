@@ -135,7 +135,7 @@ Version Control
 You can use this filesystem with version control software such as Git or Mercurial. So far I've tested:
 
 * Mercurial (`hg`) seems to work without any issues (use default value `0` for `filesize` mount option).
-* Git also seems to work, but requires mount option `filesize=-1`, which means a bit worse performance. Consider using `keepcache` mount option in this case.
+* Git also seems to work, but requires mount option `filesize=-1`, which means a bit worse performance. Consider also using `keepcache` mount option in this case.
 * Subversion won't work because it wants to create `.svn` subfolder in *every* folder. Problem is that ddlfs only 
 supports storing of DDL in `.SQL` files. (Git and Mercurial only require one folder bellow mountpoint and that's all)
 
