@@ -67,7 +67,7 @@ ddlfs. Other generic mount options may be used as well; see **mount** and **fuse
 
 
 **`database=`**`host:port/service`  
-Oracle EasyConnect string, used to connect to database.
+Oracle EasyConnect string, used to connect to database. Use `/` to connect to local instance using bequeath protocol.
 
 **`username=`**`string`  
 Username used to connect to database specified by `database` parameter.
