@@ -85,7 +85,7 @@ sign, e.g.: `APP_%:BLA_%`, which would match all schemas with names starting wit
 If you use os authentication, you'll be connected to `CDB$ROOT` by default in multitenan environment. This setting, if specified, 
 will cause **ddlfs** to issue `alter session set container=<pdb>;` right after logon.
 
-**`userrole`=**`string`
+**`userrole`=**`string`  
 You can specify role such as `SYSDBA` or `SYSOPER` here. 
 
 **`lowercase`**  
