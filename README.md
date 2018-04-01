@@ -81,7 +81,7 @@ Specify `/` to use os authentication.
 Schema or list of schemas, separated by `:`. Those are schemas of which objects are "exported" as `.sql` files. You may specify (multiple) partial schema name(s) using `%`
 sign, e.g.: `APP_%:BLA_%`, which would match all schemas with names starting with either `APP_` or `BLA_`. It defaults '%' (to show all schemas).
 
-**`pdb=`=**`string`
+**`pdb=`=**`string`  
 If you use os authentication, you'll be connected to `CDB$ROOT` by default in multitenan environment. This setting, if specified, 
 will cause **ddlfs** to issue `alter session set container=<pdb>;` right after logon.
 
