@@ -4,6 +4,8 @@
 
 **FUSE filesystem, which represents Oracle Database objects as their DDL stored in `.SQL` files.**
 
+![ddlfs demo](https://raw.githubusercontent.com/usrecnik/ddlfs/master/docs/ddlfs-demo.gif)
+
 Installation
 ------------
 `apt install ./ddlfs-<ver>.deb`  
