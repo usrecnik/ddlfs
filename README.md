@@ -98,7 +98,7 @@ Defines verbosity used for stdout messages. Default value is `INFO`.
 Where to store temporary files - offline copies of DDL statements while their files are open. 
 `/tmp` location is used by default. All files created by **ddlfs** have names prefixed by `ddlfs-<PID>` in this folder.
 
-**`keepcache`**
+**`keepcache`**  
 Local temporary files (created in `temppath=` folder) are deleted on umount by default. Specify this mount option to 
 keep those temp files intact after umount. This has performance benefits when using `filesize=-1`. 
 
