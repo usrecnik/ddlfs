@@ -72,10 +72,10 @@ int ora_connect(char* username, char* password, char* database) {
         user_role = OCI_SYSOPER;
     
     
-    logmsg(LOG_INFO, "Connecting to Oracle Database (%s)", database);
+    logmsg(LOG_DEBUG, "Connecting to Oracle Database (%s)", database);
     
     if (auth_type == OCI_CRED_EXT)
-        logmsg(LOG_INFO, ".. using external authentiaction.");
+        logmsg(LOG_DEBUG, ".. using external authentiaction.");
 
     r = OCIEnvCreate(&g_connection.env, OCI_DEFAULT, 0, 0, 0, 0, 0, 0);
     if (ora_check(r) != OCI_SUCCESS)
@@ -139,7 +139,7 @@ int ora_connect(char* username, char* password, char* database) {
     int major = MAJOR_NUMVSN(version_int);
     int minor = MINOR_NUMRLS(version_int);
     g_conf._server_version = major*100+minor;
-    logmsg(LOG_INFO, ".. connected to server version [%s] [%d]", version_str, g_conf._server_version);
+    logmsg(LOG_DEBUG, ".. connected to server version [%s] [%d]", version_str, g_conf._server_version);
 
 
     if (g_conf.pdb != NULL) {
@@ -163,7 +163,7 @@ int ora_connect(char* username, char* password, char* database) {
             ora_stmt_free(o_stm);
     }
 
-    logmsg(LOG_INFO, ".. connected.");
+    logmsg(LOG_INFO, ".. connected to database server.");
     return EXIT_SUCCESS;
 }
 

@@ -84,8 +84,10 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
         strcpy(g_conf.loglevel, "INFO");
     }
 
-    if (g_conf.schemas == NULL)
-        g_conf.schemas = g_conf.username;
+    if (g_conf.schemas == NULL) {
+        g_conf.schemas = calloc(10, sizeof(char));
+        strcpy(g_conf.schemas, "%");
+    }
 
     if (g_conf.keepcache == -1)
         g_conf.keepcache = 0;

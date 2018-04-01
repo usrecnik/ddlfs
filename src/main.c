@@ -31,8 +31,8 @@ int main(int argc, char *argv[]) {
     g_conf.mountpoint = realpath(argv[argc-1], NULL);
     logmsg(LOG_DEBUG, ".. mounting at [%s]", g_conf.mountpoint);
 
-    logmsg(LOG_INFO, " ");
-    logmsg(LOG_INFO, "-> mount <-");
+    logmsg(LOG_DEBUG, " ");
+    logmsg(LOG_DEBUG, "-> mount <-");
         
     struct fuse_args args = parse_arguments(argc, argv);
     if (args.argc == -1) {
@@ -67,12 +67,13 @@ int main(int argc, char *argv[]) {
 
     g_vfs = vfs_entry_create('D', "/", time(NULL), time(NULL));
     
-    logmsg(LOG_INFO, " ");
-    logmsg(LOG_INFO, "-> event-loop <-");
+    logmsg(LOG_DEBUG, " ");
+    logmsg(LOG_DEBUG, "-> event-loop <-");
+    printf("\n");
     int r = fuse_main(args.argc, args.argv, &oper, NULL);
     
-    logmsg(LOG_INFO, " ");
-    logmsg(LOG_INFO, "-> umount <-");
+    logmsg(LOG_DEBUG, " ");
+    logmsg(LOG_DEBUG, "-> umount <-");
     ora_disconnect();
     
     if (g_conf.keepcache == 0) {
