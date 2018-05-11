@@ -5,6 +5,7 @@ __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 #include <stdarg.h>
 #include <stdlib.h>
 #include <time.h>
+#include <syslog.h>
 
 #include "logging.h"
 #include "config.h"
@@ -56,9 +57,19 @@ void logmsg(int level, const char *msg, ...) {
     strncat(format, msg, 150);    
     strcat(format, "\n");
     
-    if (level == 1 || level <= get_levelint(g_conf.loglevel)) {
+    if (level == LOG_ERROR || level <= get_levelint(g_conf.loglevel)) {
         vfprintf((level == 1 ? stderr : stdout), format, args);
         fflush((level == 1 ? stderr : stdout));
+    }
+
+    // error messages are logged to syslog, regardless of any ddlfs settings
+    if (level == LOG_ERROR) {
+        va_end(args);
+        va_start(args, msg);
+        
+        openlog("ddlfs", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+        vsyslog(LOG_ERR, msg, args);
+        closelog();
     }
 
     free(format);

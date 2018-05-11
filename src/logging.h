@@ -4,8 +4,12 @@
 #include <time.h>
 
 #define LOG_ERROR 1
-#define LOG_INFO  2
-#define LOG_DEBUG 3
+#ifndef LOG_INFO
+    #define LOG_INFO 6
+#endif
+#ifndef LOG_DEBUG
+    #define LOG_DEBUG 7
+#endif
 
 #define DDL_LOG_SIZE 10000
 

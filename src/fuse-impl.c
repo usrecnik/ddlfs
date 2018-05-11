@@ -1,4 +1,4 @@
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE // #define _BSD_SOURCE was deprecated with _DEFAULT_SOURCE
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
 
@@ -128,7 +128,7 @@ int fs_getattr( const char *path, struct stat *st )
     logmsg(LOG_DEBUG, "fuse-getattr: [%s]", path);
 
     if (entry == NULL) {
-        logmsg(LOG_ERROR, "fuse-getattr: File not found [%s]\n\n", path);
+        logmsg(LOG_INFO, "fuse-getattr: File not found [%s]\n\n", path);
         return -ENOENT;
     }
 
@@ -190,7 +190,7 @@ int fs_readdir(const char *path,
 static int fake_open(const char *path,
                      struct fuse_file_info *fi) {
 
-    logmsg(LOG_INFO, "fake-open: [%s]", path);
+    logmsg(LOG_DEBUG, "fake-open: [%s]", path);
     char **part;
     int depth = fs_path_create(&part, path);
     if (depth != DEPTH_MAX) {
@@ -213,7 +213,7 @@ static int fake_open(const char *path,
         return -1;
     }
     
-    return fh;    
+    return fh;
 }
 
 int fs_open(const char *path, 
@@ -260,7 +260,7 @@ int fs_read(const char *path,
             off_t offset,
             struct fuse_file_info *fi) {
 
-    logmsg(LOG_INFO, "fuse-read: [%s], offset=[%d]", path, offset);
+    logmsg(LOG_DEBUG, "fuse-read: [%s], offset=[%d]", path, offset);
     
     int fd;
     int res;

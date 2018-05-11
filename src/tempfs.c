@@ -10,7 +10,6 @@
 #include <sys/types.h>
 #include <sys/xattr.h>
 #include <dirent.h>
-#include <openssl/evp.h>
 
 #include "config.h"
 #include "logging.h"
