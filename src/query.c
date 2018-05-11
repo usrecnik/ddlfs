@@ -533,7 +533,9 @@ order by s.\"LINE\"");
             type_spaces++;
 
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+        
         if (first) {
+            
             if (tfs_validate(fname, o_sl2, last_ddl_time) == EXIT_SUCCESS) {
                 // logmsg(LOG_DEBUG, "qry_object_all_source - tempfile [%s] is up2date.");
                 break;
@@ -582,6 +584,7 @@ order by s.\"LINE\"");
              
             // replace everything before 'BEFORE', 'AFTER', 'INSTEAD' with:
             // 'create or replace <editionable> trigger "<owner>"."<trigger-name>" '
+            // DEBUG: trigger bucket_racuni_instead instead of update or delete or insert on bucket_racuni
             char *kw_all[3] = {"BEFORE", "AFTER", "INSTEAD"};
             char *kw_which = NULL; // which keyword out of kw_all was found, one of the 3 strings in kw_all 
             char *kw_found = NULL; // return value form strcasestr, where did we found the kw_which
@@ -589,20 +592,27 @@ order by s.\"LINE\"");
             char *kw_before = NULL; 
             int line = 1;
             while (kw_found == NULL) {
+                
                 for (int i = 0; i < 3; i++) {
-                    kw_found = strcasestr(o_sl1, kw_all[i]);
+                    
+                    char *kw_haystack = o_sl1;
+
+                    trigger_retry_keyword:
+                    kw_found = strcasestr(kw_haystack, kw_all[i]);
                     if (kw_found != NULL) {
                         kw_which = kw_all[i];
                         kw_after = kw_found + strlen(kw_which);
-                        kw_before = (kw_found == o_sl1 ? NULL : kw_found - 1);
+                        kw_before = (kw_found == kw_haystack ? NULL : kw_found - 1);
 
                         if ((kw_after[0] != ' ' && kw_after[0] != '\n' && kw_after[0] != '\r' && kw_after[0] != '\t') || 
                             (kw_before != NULL && kw_before[0] != ' ' && kw_before[0] != '\n' && kw_before[0] != '\r' && kw_before[0] != '\t')) {
                             // so, this is not really a keyword
+                            kw_haystack += strlen(kw_which);
                             kw_which = NULL;
                             kw_after = NULL;
                             kw_before = NULL;
-                            kw_found = NULL;
+                            kw_found = NULL;                            
+                            goto trigger_retry_keyword;
                         }
                     }
                     if (kw_found != NULL)
@@ -613,6 +623,11 @@ order by s.\"LINE\"");
                     // none of 3 keywords was found on this line, fetch next line
                     ora_stmt_fetch(o_stm);
                     line++;
+                }
+                if (line > 100) {
+                    logmsg(LOG_ERROR, "Unable to find specific [before|after|instead] keyword in trigger [%s].[%s]", schema, object);
+                    retval = EXIT_FAILURE;
+                    goto qry_object_all_source_cleanup;
                 }
             }
             if (kw_found == NULL) {
@@ -626,7 +641,7 @@ order by s.\"LINE\"");
             first=0;
             continue;
         }
-         
+        
         if (first && !is_view_source && !is_java_source && !is_trigger_source) {
             // replace multiple spaces with single space
             org = o_sl1;
