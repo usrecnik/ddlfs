@@ -527,12 +527,14 @@ order by s.\"LINE\"");
     char *tmp = type;
     char *org = NULL;
     char editionable[30] = "";
+    int row_count = 0;
     
     for(; *tmp != '\0'; tmp++)
         if (*tmp == ' ')
             type_spaces++;
 
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+        row_count++;
         
         if (first) {
             
@@ -684,6 +686,31 @@ order by s.\"LINE\"");
         }
 
         first=0;
+    }
+
+    if (row_count == 0) {
+        logmsg(LOG_ERROR, "There is no source in all_source for [%s] [%s].[%s]", type, schema, object);
+        /* Create empty file (if we die with error here, then mercurial/git probably won't work properly).
+           This is Oracle Bug, objects without sources should never exist, although they do sometimes, like in this case,
+           where object in PDB references object in CDB, which does not exist:
+
+            SQL> select con_id, sharing, owner, object_name from cdb_objects where object_name='WWV_DBMS_SQL';
+
+                    CON_ID SHARING         OWNER      OBJECT_NAME
+                ---------- --------------- ---------- ------------------------------
+                         3 METADATA LINK   SYS        WWV_DBMS_SQL
+                         3 METADATA LINK   SYS        WWV_DBMS_SQL
+
+        */
+        
+        fp = fopen(fname, "w");
+        if (fp == NULL) {
+            logmsg(LOG_ERROR, "Unable to open %s. Error=%d (%s).", fname, errno, strerror(errno));
+            retval = EXIT_FAILURE;
+            goto qry_object_all_source_cleanup;
+        }
+        char empty_msg[] = "-- source for this object not found in all_source view.\n";
+        fwrite(empty_msg, 1, strlen(empty_msg), fp);
     }
 
      
