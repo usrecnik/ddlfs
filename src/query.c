@@ -15,6 +15,7 @@
 #include "oracle.h"
 #include "vfs.h"
 #include "tempfs.h"
+#include "query_tables.h"
 
 #define LOB_BUFFER_SIZE 8196
 
@@ -173,7 +174,7 @@ static int str_fs2oratype(char **fstype) {
         return EXIT_FAILURE;
     }
     
-    *fstype= type;
+    *fstype = type;
     return EXIT_SUCCESS;
 }
 
@@ -791,8 +792,11 @@ int qry_object(char *schema,
     
     is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
     is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
-     
-    qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
+
+    if (strcmp(object_type, "TABLE") == 0)
+        qry_object_all_tables(object_schema, object_name, *fname, &last_ddl_time);
+    else     
+        qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
     
     // set standard file attributes on cached file (atime & mtime)
     newtime.actime = time(NULL);
@@ -959,6 +963,7 @@ int qry_types(t_fsentry *schema) {
         "package_body",
         "package_spec",
         "procedure",
+        "table",
         "trigger",
         "type",
         "type_body",
