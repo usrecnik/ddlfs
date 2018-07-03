@@ -82,9 +82,9 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
     int retval = EXIT_SUCCESS;
 
     char definition[4096];                  // buffer (on stack) in which to build column representation
-    struct columndef *col_start = NULL;     // always points to first column if there is at least one column present
-    struct columndef *col_temp = NULL;      // temporary, points to any columns
-    struct columndef *col_curr = NULL;      // for loops, used as pointer to current element
+    struct deflist *col_start = NULL;     // always points to first column if there is at least one column present
+    struct deflist *col_temp = NULL;      // temporary, points to any columns
+    struct deflist *col_curr = NULL;      // for loops, used as pointer to current element
     
     OCIStmt   *o_stm = NULL;
     OCIDefine *o_def = NULL;
@@ -275,7 +275,7 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
                 (i_nullable != 0 ? "X" : (o_nullable[0] == 'Y' ? "NULL" : "NOT NULL")));
 
         // allocate and populate new column
-        col_temp = malloc(sizeof(struct columndef));
+        col_temp = malloc(sizeof(struct deflist));
         if (col_temp == NULL) {
             logmsg(LOG_ERROR, "tab_all_tab_columns() - Unable to allocate memory for column definition.");
             goto tab_all_tab_columns_cleanup;
@@ -290,7 +290,6 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
         if (col_start == NULL)
             col_start = col_temp;
         else {
-            logmsg(LOG_DEBUG, "DBG1");
             col_curr = col_start;
             while (col_curr->next != NULL)
                 col_curr = col_curr->next;
@@ -320,7 +319,260 @@ tab_all_tab_columns_cleanup:
         ora_stmt_free(o_stm);
     
     return retval;
+}
+
+static void deflist_append(struct deflist **first, struct deflist *fresh) {
+    fresh->next = NULL;
+    if (*first == NULL) {
+        *first = fresh;
+        return;
+    }
+    
+    struct deflist *temp = *first;
+    while (temp->next != NULL)
+        temp = temp->next;
+    temp->next = fresh;
+}
+
+static int tab_all_constraints(const char *schema, const char *table, struct tabledef *def) {
+    const char *query = 
+"select * from (\
+ select ac.constraint_name, ac.constraint_type, ac.index_owner, ac.index_name, ac.r_owner, rc.table_name as r_table_name,\
+ listagg('\"' || replace(cc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by cc.position) as colstr,\
+ listagg('\"' || replace(rc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by cc.position) as r_colstr,\
+ null as search_condition\
+ from all_constraints ac\
+ join all_cons_columns cc on cc.owner=ac.owner and cc.table_name=ac.table_name and cc.constraint_name=ac.constraint_name\
+ left join all_cons_columns rc on rc.owner=ac.r_owner and rc.constraint_name=ac.r_constraint_name\
+ where ac.owner=:bind_owner and ac.table_name=:bind_name and ac.generated='USER NAME' and ac.constraint_type IN ('P', 'U', 'R')\
+ group by ac.constraint_name, ac.constraint_type, ac.index_owner, ac.index_name, ac.r_owner, rc.table_name\
+ union all\
+ select constraint_name, constraint_type, null, null, null, null,\
+ null, null, search_condition\
+ from all_constraints\
+ where owner=:bind_owner and table_name=:bind_name and generated='USER NAME' and constraint_type='C')\
+ order by decode(constraint_type, 'P', 1, 'U', 2, 'R', 3, 'C', 4, 5), constraint_name";
+
+    puts(query);
+
+    int retval = EXIT_SUCCESS;
+    
+    OCIStmt   *o_stm = NULL;
+    OCIDefine *o_def = NULL;
+    OCIBind   *o_bn1 = NULL;
+    OCIBind   *o_bn2 = NULL;
+    OCIBind   *o_bn3 = NULL;
+    OCIBind   *o_bn4 = NULL;
+
+    char o_constraint_name[129] = "\0";     // VARCHAR2(128) NOT NULL 
+    char o_constraint_type[2] = "\0";       // VARCHAR2(1)
+    char o_index_owner[129] = "\0";         // VARCHAR2(128)
+    char o_index_name[129] = "\0";          // VARCHAR2(128)
+    char o_ref_owner[129] = "\0";           // VARCHAR2(128)
+    char o_ref_table[129] = "\0";           // VARCHAR2(128)
+    char o_colstr[4000] = "\0";             // VARCHAR2(4000)
+    char o_ref_colstr[4000] = "\0";         // VARCHAR2(4000)
+    char o_search_condition[32767] = "\0";  // LONG
+
+    sb2 i_constraint_type = 0;
+    sb2 i_index_owner = 0;
+    sb2 i_index_name = 0;
+    sb2 i_ref_owner = 0;
+    sb2 i_ref_table = 0;
+    sb2 i_colstr = 0;
+    sb2 i_ref_colstr = 0;
+    sb2 i_search_condition = 0;
+    
+    struct deflist *tmpdef;
+     
+    // prepare
+    if (ora_stmt_prepare(&o_stm, query)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to prepare statement");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    // define
+    if (ora_stmt_define(o_stm, &o_def, 1, o_constraint_name, 129*sizeof(char), SQLT_STR)) { // NOT NULL
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define constraint_name");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 2, o_constraint_type, 2*sizeof(char), SQLT_STR, (dvoid*) &i_constraint_type)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define constraint_type");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 3, o_index_owner, 129*sizeof(char), SQLT_STR, (dvoid*) &i_index_owner)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define index_owner");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 4, o_index_name, 129*sizeof(char), SQLT_STR, (dvoid*) &i_index_name)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define index_name");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 5, o_ref_owner, 129*sizeof(char), SQLT_STR, (dvoid*) &i_ref_owner)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define ref_owner");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 6, o_ref_table, 129*sizeof(char), SQLT_STR, (dvoid*) &i_ref_table)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define ref_table");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 7, o_colstr, 4000*sizeof(char), SQLT_STR, (dvoid*) &i_colstr)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define colstr");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 8, o_ref_colstr, 4000*sizeof(char), SQLT_STR, (dvoid*) &i_ref_colstr)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define ref_colstr");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_define_i(o_stm, &o_def, 9, o_search_condition, 32767*sizeof(char), SQLT_STR, (dvoid*) &i_search_condition)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to define search_condition");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    
+    // bind
+    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) schema, strlen(schema)+1, SQLT_STR)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to bind schema (1)");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) table, strlen(table)+1, SQLT_STR)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to bind table (1)");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to bind schema (2)");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+
+    if (ora_stmt_bind(o_stm, &o_bn4, 4, (void*) table, strlen(table)+1, SQLT_STR)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to bind table (2)");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+    
+     // execute
+    if (ora_stmt_execute(o_stm, 0)) {
+        logmsg(LOG_ERROR, "tab_all_constraints(): Unable to execute query.");
+        retval = EXIT_FAILURE;
+        goto tab_all_constraints_cleanup;
+    }
+    
+    // loop resultset
+    char tmpstr[8192];
+    char tmpstr_part[500];
+    while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+
+        logmsg(LOG_DEBUG, "constraint {");
+        logmsg(LOG_DEBUG, ".. constraint_name=[%s]", o_constraint_name);
+        logmsg(LOG_DEBUG, ".. constraint_type=[%s]", (i_constraint_type == 0 ? o_constraint_type : "NULL"));
+        logmsg(LOG_DEBUG, ".. index_name=[%s]", (i_index_name == 0 ? o_index_name : "NULL"));
+        logmsg(LOG_DEBUG, ".. index_owner=[%s]", (i_index_owner == 0 ? o_index_owner : "NULL"));
+        logmsg(LOG_DEBUG, ".. ref_owner=[%s]", (i_ref_owner == 0 ? o_ref_owner : "NULL"));
+        logmsg(LOG_DEBUG, ".. ref_table=[%s]", (i_ref_table == 0 ? o_ref_table : "NULL"));
+        logmsg(LOG_DEBUG, ".. colstr=[%s]", (i_colstr == 0 ? o_colstr : "NULL"));
+        logmsg(LOG_DEBUG, ".. ref_colstr=[%s]", (i_ref_colstr == 0 ? o_ref_colstr : "NULL"));
+        logmsg(LOG_DEBUG, ".. search_condition=[%s]", (i_search_condition == 0 ? o_search_condition : "NULL"));
+        logmsg(LOG_DEBUG, "}");
+
+        switch((i_constraint_type == 0 ? o_constraint_type[0] : 'x')) {
+            case 'P': strcpy(tmpstr_part, "PRIMARY KEY"); break;
+            case 'U': strcpy(tmpstr_part, "UNIQUE");      break;
+            case 'R': strcpy(tmpstr_part, "FOREIGN KEY"); break;
+            case 'C': strcpy(tmpstr_part, "CHECK");       break;
+            default : strcpy(tmpstr_part, "UNKNOWN");     break;
+        }
+        
+        snprintf(tmpstr, 8192, "ALTER TABLE \"%s\".\"%s\" ADD CONSTRAINT \"%s\" %s",
+            schema, table, o_constraint_name, tmpstr_part
+        );
+        
+        if (i_index_owner == 0 && i_index_name == 0)
+            snprintf(tmpstr_part, 500, " USING INDEX \"%s\".\"%s\"", o_index_owner, o_index_name);
+        else if (i_index_owner !=0 && i_index_name == 0) 
+            snprintf(tmpstr_part, 500, " USING INDEX \"%s\"", o_index_name);
+        else
+            tmpstr_part[0] = '\0';
+
+        strcat(tmpstr, tmpstr_part);
+        tmpstr_part[0] = '\0';
+
+        switch (i_constraint_type == 0 ? o_constraint_type[0] : 'x') {
+            case 'R':
+                snprintf(tmpstr_part, 500, " (%s) REFERENCES \"%s\".\"%s\"(%s)",
+                    (i_colstr == 0 ? o_colstr : "???"),
+                    (i_ref_owner == 0 ? o_ref_owner : "???"),
+                    (i_ref_table == 0 ? o_ref_table : "???"),
+                    (i_ref_colstr == 0 ? o_ref_colstr : "???"));
+                break;
+            
+            case 'C':
+                snprintf(tmpstr_part, 500, " (%s)", (i_search_condition == 0 ? o_search_condition : "???"));
+                break;
+        }
+        strcat(tmpstr, tmpstr_part);
+        strcat(tmpstr, ";\n");
+         
+        // append to linked list        
+        tmpdef = malloc(sizeof(struct deflist));
+        if (tmpdef == NULL) {
+            logmsg(LOG_ERROR, "tab_all_constraints(): Unable to malloc tmpdef");
+            retval = EXIT_FAILURE;
+            goto tab_all_constraints_cleanup;
+        }
+
+        tmpdef->definition = malloc(strlen(tmpstr));
+        if (tmpdef->definition == NULL) {
+            logmsg(LOG_ERROR, "tab_all_constraitns(): Unable to malloc tmpdef->definition");
+            retval = EXIT_FAILURE;
+            goto tab_all_constraints_cleanup;
+        }
+        strcpy(tmpdef->definition, tmpstr);
+        
+        deflist_append(&def->constraints, tmpdef);
+    }
+    
    
+tab_all_constraints_cleanup:
+    
+    if (o_stm != NULL)
+        ora_stmt_free(o_stm);  
+ 
+    return retval; 
+}
+
+static void deflist_free(struct deflist *curr) {
+    if (curr == NULL)
+        return;
+    
+    while (curr != NULL) {
+        free(curr->definition);
+        struct deflist *temp = curr;
+        curr = curr->next;
+        free(temp);
+    }
 }
 
 int qry_object_all_tables(const char *schema,
@@ -332,7 +584,7 @@ int qry_object_all_tables(const char *schema,
     FILE *fp;
     char temp[4096];
     struct tabledef *def = malloc(sizeof(struct tabledef));
-    struct columndef *col;
+    struct deflist *col;
     int colcnt = 0;
 
     if (def == NULL) {
@@ -352,6 +604,12 @@ int qry_object_all_tables(const char *schema,
         goto qry_object_all_tables_cleanup;
     }
 
+    if (tab_all_constraints(schema, table, def) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_object_all_tables(): tab_all_constraints() failed.");
+        retval = EXIT_FAILURE;
+        goto qry_object_all_tables_cleanup;
+    }
+    
     fp = fopen(fname, "w");
     if (fp == NULL) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to open [%s]: %d %n", fname, errno, strerror(errno));
@@ -363,6 +621,7 @@ int qry_object_all_tables(const char *schema,
         (def->temporary == 'Y' ? " GLOBAL TEMPORARY" : ""),
         schema, table);
     fwrite(temp, 1, strlen(temp), fp);
+
     col = def->columns;
     while (col != NULL) {
         if (colcnt++ > 0)
@@ -370,30 +629,27 @@ int qry_object_all_tables(const char *schema,
         fwrite(col->definition, 1, strlen(col->definition), fp);
         col = col->next;
     }
-    fwrite(");\n", 1, strlen(");\n"), fp);
+    fwrite(");\n\n", 1, strlen(");\n\n"), fp);
+    
+    col = def->constraints;
+    while(col != NULL) {
+        fwrite(col->definition, 1, strlen(col->definition), fp);
+        col = col->next;   
+    }
     
     if (fclose(fp) != 0) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to close [%s]: %d %n", fname, errno, strerror(errno));
         retval = EXIT_FAILURE;
         goto qry_object_all_tables_cleanup;
     }
-   
-    
-    // @todo: constraints
+     
     // @todo: indexes
     // @todo: comments
     
 qry_object_all_tables_cleanup:
     if (def != NULL) {
-        if (def->columns != NULL) {
-            col = def->columns;
-            while (col != NULL) {
-                free(col->definition);
-                struct columndef *tmp = col;                
-                col = col->next;
-                free(tmp);
-            }
-        }
+        deflist_free(def->columns);
+        deflist_free(def->constraints);
         free(def);
     }
      

@@ -1,15 +1,15 @@
-struct columndef {
+struct deflist {
     char *definition; 
-    struct columndef *next;
+    struct deflist *next;
 };
 
 struct tabledef {
     char temporary; // 'Y' or 'N'
-    struct columndef *columns;
+    struct deflist *columns;
+    struct deflist *constraints;
 };
 
 int qry_object_all_tables(const char *schema,
                           const char *table,
                           const char *fname,
                           time_t *last_ddl_time);
-
