@@ -189,6 +189,9 @@ int ora_disconnect() {
 sword ora_stmt_prepare(OCIStmt **stm, const char *query) {
     sword r;
 
+    sb4 prefetch_memory = ORA_PREFETCH_MEMORY;
+    sb4 prefetch_rows = ORA_PREFETCH_ROWS;
+
     r = OCIHandleAlloc(g_connection.env, (void **) stm, OCI_HTYPE_STMT, 0, 0);
     if (ora_check(r))
         return r;
@@ -196,7 +199,15 @@ sword ora_stmt_prepare(OCIStmt **stm, const char *query) {
     r = OCIStmtPrepare(*stm, g_connection.err, (text*) query, strlen(query), OCI_NTV_SYNTAX, OCI_DEFAULT);
     if (ora_check(r))
         return r;
+    
+    r = OCIAttrSet(*stm, OCI_HTYPE_STMT, &prefetch_memory, sizeof(prefetch_memory), OCI_ATTR_PREFETCH_MEMORY, g_connection.err);
+    if (ora_check(r))
+        return r;
 
+    r = OCIAttrSet(*stm, OCI_HTYPE_STMT, &prefetch_rows, sizeof(prefetch_rows), OCI_ATTR_PREFETCH_ROWS, g_connection.err);
+    if (ora_check(r))
+        return r;
+    
     return r;
 }
 

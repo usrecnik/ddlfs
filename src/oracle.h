@@ -2,6 +2,9 @@
 
 #include <oci.h>
 
+#define ORA_PREFETCH_MEMORY 1024*1024 // 1 MB
+#define ORA_PREFETCH_ROWS   1000
+
 /**
  * global variable to hold OCI connection state.
  * */
