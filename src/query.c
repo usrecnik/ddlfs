@@ -399,130 +399,60 @@ static int qry_object_all_source(const char *schema,
         if (is_view_source) {
             strcpy(query,
 // 11g ALL_VIEWS
-"select w.text as s, \
-to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
-null as e \
-from all_views w \
-join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type \
-where w.view_name=:bind_object and w.owner=:bind_schema");
+"select w.text as s,\
+ to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ null as e\
+ from all_views w\
+ join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
+ where w.view_name=:bind_object and w.owner=:bind_schema");
         } else {
             strcpy(query, 
 // 11g ALL_OBJECTS
-"select nvl(s.\"TEXT\", '\n') as s, \
-to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
-null as e \
-from all_source s \
-join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
-and (o.object_type != 'TYPE' or o.subobject_name IS NULL) \
-where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
-order by s.\"LINE\"");
+"select nvl(s.\"TEXT\", '\n') as s,\
+ to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ null as e\
+ from all_source s\
+ join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\"\
+ and (o.object_type != 'TYPE' or o.subobject_name IS NULL)\
+ where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema\
+ order by s.\"LINE\"");
         }
     } else {
         if (is_view_source) {
             strcpy(query, 
 // 12c ALL_VIEWS
-"select w.text as s, \
-to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
-o.\"EDITIONABLE\" as e \
-from all_views w \
-join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type \
-where w.view_name=:bind_object and w.owner=:bind_schema");
+"select w.text as s,\
+ to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ o.\"EDITIONABLE\" as e\
+ from all_views w\
+ join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
+ where w.view_name=:bind_object and w.owner=:bind_schema");
         } else {
             strcpy(query, 
 // 12c ALL_OBJECTS
-"select nvl(s.\"TEXT\", '\n') as s, \
-to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t, \
-\"EDITIONABLE\" as e \
-from all_source s \
-join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\" \
-and (o.object_type != 'TYPE' or o.subobject_name IS NULL) \
-where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema \
-order by s.\"LINE\"");
+"select nvl(s.\"TEXT\", '\n') as s,\
+ to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ \"EDITIONABLE\" as e\
+ from all_source s\
+ join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\"\
+ and (o.object_type != 'TYPE' or o.subobject_name IS NULL)\
+ where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema\
+ order by s.\"LINE\"");
         }
     }
     
-//    printf("QUERY=[%s]", query);
-    logmsg(LOG_DEBUG, query);
+    ORA_STMT_PREPARE (qry_object_all_source);
+    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 1, text,        4*1024*1024);
+    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 2, ddl_time,    30);
+    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 3, editionable, 2);
+    ORA_STMT_BIND_STR(qry_object_all_source, 1, type);
+    ORA_STMT_BIND_STR(qry_object_all_source, 2, object);
+    ORA_STMT_BIND_STR(qry_object_all_source, 3, schema);
+    ORA_STMT_EXECUTE(qry_object_all_source, 0);
     
-    OCIStmt       *o_stm = NULL; // free
-    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
-    char          *o_sl1 = NULL; // 'line'
-    char          *o_sl2 = NULL; // 'last_ddl_time'
-    char          *o_sl3 = NULL; // 'editionable'
-    sb2            o_sl1i = 0;   // null indicator for o_sl1
-    sb2            o_sl2i = 0;   // null indicator for o_sl2
-    sb2            o_sl3i = 0;   // null indicator for o_sl3
-    OCIBind       *o_bn1 = NULL; // The bind handles are freed implicitly when 
-    OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
-    OCIBind       *o_bn3 = NULL;
-    char          *tmpstr = NULL;
-
+    char tmpstr[4096];
     size_t bytes_written;
-    FILE *fp = NULL; // free
-    
-    // if ((o_sl1 = malloc(4096*sizeof(char))) == NULL) { // this is enough for varchar2(4000) from all_source, but not for long from all_views.
-    if ((o_sl1 = malloc(4*1024*1024*sizeof(char))) == NULL) {
-        logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sl1."); 
-        return EXIT_FAILURE;
-    }
-
-    if ((o_sl2 = malloc(30*sizeof(char))) == NULL) {
-        logmsg(LOG_ERROR, "qry_object_all_source() - Unable to allocate memory for o_sl2.");
-        return EXIT_FAILURE;
-    }
-
-    if ((o_sl3 = malloc(2*sizeof(char))) == NULL) {
-        logmsg(LOG_ERROR, "qry_objec_all_source() - Unable to allocate memory for o_sl3.");
-        return EXIT_FAILURE;
-    }
-
-    if ((tmpstr = malloc(4096*sizeof(char))) == NULL) {
-        logmsg(LOG_ERROR, "qry_object_all_source - unable to allocate memory for tmpstr.");
-        free(o_sl1);
-        return EXIT_FAILURE;
-    }
- 
-    // query 
-    if (ora_stmt_prepare(&o_stm, query)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-     
-    if (ora_stmt_define_i(o_stm, &o_def, 1, o_sl1, 4*1024*1024*sizeof(char), SQLT_STR, &o_sl1i)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-    
-    if (ora_stmt_define_i(o_stm, &o_def, 2, o_sl2, 30*sizeof(char), SQLT_STR, &o_sl2i)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (ora_stmt_define_i(o_stm, &o_def, 3, o_sl3, 2*sizeof(char), SQLT_STR, &o_sl3i)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-   
-    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object, strlen(object)+1, SQLT_STR))  {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-
-    if (ora_stmt_execute(o_stm, 0)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_all_source_cleanup;
-    }
-    
+    FILE *fp = NULL;
     int first = 1;
     int type_spaces = 0;
     char *tmp = type;
@@ -534,25 +464,21 @@ order by s.\"LINE\"");
         if (*tmp == ' ')
             type_spaces++;
 
-    while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+    while (ORA_STMT_FETCH) {
         row_count++;
         
         if (first) {
             
-            if (tfs_validate(fname, o_sl2, last_ddl_time) == EXIT_SUCCESS) {
-                // logmsg(LOG_DEBUG, "qry_object_all_source - tempfile [%s] is up2date.");
+            if (tfs_validate(fname, ORA_NVL(ddl_time, "1990-01-01 01:01:01"), last_ddl_time) == EXIT_SUCCESS)
                 break;
-            }
              
-            if (o_sl3i >= 0 /* IS NOT NULL */) {
-                if (strcmp(o_sl3, "Y") == 0)
-                    strcpy(editionable, " EDITIONABLE");
-                else
-                    strcpy(editionable, " NONEDITIONABLE");
-            } else {
+            if (strcmp(ORA_NVL(editionable, "X"), "Y") == 0)
+                 strcpy(editionable, " EDITIONABLE");
+            else if (strcmp(ORA_NVL(editionable, "X"), "N") == 0) 
+                strcpy(editionable, " NONEDITIONABLE");
+            else
                 strcpy(editionable, ""); // object cannot be editioned at all (like tables for example)
-            }
-             
+                         
             fp = fopen(fname, "w");
             if (fp == NULL) {
                 logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
@@ -571,7 +497,7 @@ order by s.\"LINE\"");
             sprintf(tmpstr, "CREATE OR REPLACE FORCE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
 
-            if (o_sl1i < 0) { // TEXT is null
+            if (i_text < 0) { // TEXT is null
                 // TEXT (datatype=LONG): View text. This column returns the correct value only when the row originates
                 // from the current container. The BEQUEATH clause will not appear as part of the TEXT column in 
                 // this view.                 
@@ -598,7 +524,7 @@ order by s.\"LINE\"");
                 
                 for (int i = 0; i < 3; i++) {
                     
-                    char *kw_haystack = o_sl1;
+                    char *kw_haystack = ORA_NVL(text, " ");
 
                     trigger_retry_keyword:
                     kw_found = strcasestr(kw_haystack, kw_all[i]);
@@ -635,8 +561,8 @@ order by s.\"LINE\"");
             }
             if (kw_found == NULL) {
                 logmsg(LOG_ERROR, "qry_object_all_source: Unable to find keyword for trigger [%s][%s]", schema, object);
-                if (o_sl1 != NULL) // very unlikely case, let's do our best here (even though probably a bit off):
-                    fwrite(o_sl1, 1, strlen(o_sl1), fp);
+                if (o_text != NULL) // very unlikely case, let's do our best here (even though probably a bit off):
+                    fwrite(o_text, 1, strlen(o_text), fp);
             } else {
                 fwrite(kw_found, 1, strlen(kw_found), fp);
             }
@@ -647,8 +573,8 @@ order by s.\"LINE\"");
         
         if (first && !is_view_source && !is_java_source && !is_trigger_source) {
             // replace multiple spaces with single space
-            org = o_sl1;
-            tmp = o_sl1;
+            org = ORA_NVL(text, " ");
+            tmp = ORA_NVL(text, " ");
             while (*tmp != '\0') {
                 while (*tmp == ' ' && *(tmp + 1) == ' ')
                     tmp++;
@@ -658,8 +584,8 @@ order by s.\"LINE\"");
             *org = '\0';
 
             // skip first word(s)
-            org = o_sl1;
-            tmp = o_sl1;
+            org = ORA_NVL(text, " ");
+            tmp = ORA_NVL(text, " ");
             for (int i = 0; i < type_spaces+1; i++) {
                 while (*tmp != '\0' && *tmp != ' ')
                     tmp++;
@@ -675,10 +601,10 @@ order by s.\"LINE\"");
             }
             
         } else {
-            bytes_written = fwrite(o_sl1, 1, strlen(o_sl1), fp);
-            if (bytes_written != strlen(o_sl1)) {
+            bytes_written = fwrite(ORA_NVL(text, ""), 1, strlen(ORA_NVL(text, "")), fp);
+            if (bytes_written != strlen(ORA_NVL(text, ""))) {
                 retval = EXIT_FAILURE;
-                logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(o_sl1));
+                logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(ORA_NVL(text, "")));
                 goto qry_object_all_source_cleanup;
             }
             
@@ -716,18 +642,7 @@ order by s.\"LINE\"");
 
      
 qry_object_all_source_cleanup:
-
-    if (o_sl1 != NULL)
-        free(o_sl1);
-
-    if (o_sl2 != NULL)
-        free(o_sl2);
-
-    if (tmpstr != NULL)
-        free(tmpstr);    
-
-    if (o_stm != NULL)
-        ora_stmt_free(o_stm);
+    ORA_STMT_FREE;
 
     if ( (fp != NULL) && (fclose(fp) != 0) )
         logmsg(LOG_ERROR, "qry_object_all_source() - Unable to close FILE* (qry_object_cleanup)");

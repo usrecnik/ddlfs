@@ -63,10 +63,14 @@ static int tab_all_tables(const char *schema, const char *table, struct tabledef
     ORA_STMT_DEFINE_STR_I(tab_all_tables, 1, temporary, 2);
     ORA_STMT_BIND_STR(tab_all_tables, 1, schema);
     ORA_STMT_BIND_STR(tab_all_tables, 2, table);
-    ORA_STMT_EXECUTE(tab_all_tables, 1);    
-
-    def->temporary = (strcmp(ORA_NVL(temporary, "N"), "Y") == 0) ? 'Y' : 'N';
-    
+    ORA_STMT_EXECUTE(tab_all_tables, 0);
+    if (ORA_STMT_FETCH) {
+        def->exists = 'Y';    
+        def->temporary = (strcmp(ORA_NVL(temporary, "N"), "Y") == 0) ? 'Y' : 'N';
+    } else {
+        def->exists = 'N';
+        def->temporary = 'N';
+    }
 tab_all_tables_cleanup:
     ORA_STMT_FREE;
     return retval;
@@ -82,7 +86,6 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
     int retval = EXIT_SUCCESS;
         
     ORA_STMT_PREPARE(tab_all_tab_columns);
-
     ORA_STMT_DEFINE_STR  (tab_all_tab_columns, 1,  column_name, 129);
     ORA_STMT_DEFINE_STR_I(tab_all_tab_columns, 2,  data_type, 129);
     ORA_STMT_DEFINE_INT  (tab_all_tab_columns, 3,  data_length);
@@ -441,7 +444,13 @@ int qry_object_all_tables(const char *schema,
         goto qry_object_all_tables_cleanup;
     }
 
-    snprintf(temp, 4095, "CREATE%s TABLE \"%s\".\"%s\" (\n",
+    if (def->exists == 'N') {
+        snprintf(temp, 4096, "/* this table is not present in all_tables */\n");
+        fwrite(temp, 1, strlen(temp), fp);
+        goto qry_object_all_tables_cleanup;
+    }
+
+    snprintf(temp, 4096, "CREATE%s TABLE \"%s\".\"%s\" (\n",
         (def->temporary == 'Y' ? " GLOBAL TEMPORARY" : ""),
         schema, table);
     fwrite(temp, 1, strlen(temp), fp);
@@ -468,14 +477,13 @@ int qry_object_all_tables(const char *schema,
         col = col->next;
     }
     fwrite("\n", 1, strlen("\n"), fp);
-    
-    if (fclose(fp) != 0) {
-        logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to close [%s]: %d %n", fname, errno, strerror(errno));
-        retval = EXIT_FAILURE;
-        goto qry_object_all_tables_cleanup;
-    }
-     
+
+
 qry_object_all_tables_cleanup:
+
+    if (fp != NULL && fclose(fp) != 0) 
+        logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to close [%s]: %d %n", fname, errno, strerror(errno));
+    
     if (def != NULL) {
         if (def->columns != NULL)
             deflist_free(def->columns);
