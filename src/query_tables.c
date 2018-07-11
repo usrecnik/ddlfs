@@ -10,18 +10,35 @@
 #include "vfs.h"
 #include "tempfs.h"
 
-static void deflist_append(struct deflist **first, struct deflist *fresh) {
+static int deflist_append(struct deflist **first, const char *def) {
+    struct deflist *fresh = malloc(sizeof(struct deflist));
+    if (fresh == NULL) {
+        logmsg(LOG_ERROR, "deflist_append(): Unable to allocate memory for fresh");
+        return EXIT_FAILURE;
+    }
+    
+    fresh->definition = calloc(strlen(def)+1, sizeof(char));
+    if (fresh->definition == NULL) {
+        logmsg(LOG_ERROR, "deflist_append(): Unable to allocate memory for definition");
+        return EXIT_FAILURE;
+    }
+
+    strcpy(fresh->definition, def);
+     
     fresh->next = NULL;
+
     if (*first == NULL) {
         *first = fresh;
-        return;
+        return EXIT_SUCCESS;
     }
     
     struct deflist *temp = *first;
     while (temp->next != NULL)
         temp = temp->next;
     temp->next = fresh;
+    return EXIT_SUCCESS;
 }
+
 
 static void deflist_free(struct deflist *curr) {
     if (curr == NULL)
@@ -43,9 +60,9 @@ static int tab_all_tables(const char *schema, const char *table, struct tabledef
     int retval = EXIT_SUCCESS;
 
     ORA_STMT_PREPARE(tab_all_tables);
-    ORA_STMT_DEFINE_STR_I(1, 2, temporary, tab_all_tables);
-    ORA_STMT_BIND_STR(1, schema, tab_all_tables);
-    ORA_STMT_BIND_STR(2, table,  tab_all_tables);
+    ORA_STMT_DEFINE_STR_I(tab_all_tables, 1, temporary, 2);
+    ORA_STMT_BIND_STR(tab_all_tables, 1, schema);
+    ORA_STMT_BIND_STR(tab_all_tables, 2, table);
     ORA_STMT_EXECUTE(tab_all_tables, 1);    
 
     def->temporary = (strcmp(ORA_NVL(temporary, "N"), "Y") == 0) ? 'Y' : 'N';
@@ -65,20 +82,19 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
     int retval = EXIT_SUCCESS;
         
     ORA_STMT_PREPARE(tab_all_tab_columns);
-    ORA_STMT_DEFINE_STR  (1, 129,  column_name,    tab_all_tab_columns);
-    ORA_STMT_DEFINE_STR_I(2, 129,  data_type,      tab_all_tab_columns);
-    ORA_STMT_DEFINE_INT  (3,       data_length,    tab_all_tab_columns);
-    ORA_STMT_DEFINE_INT_I(4,       data_precision, tab_all_tab_columns);
-    ORA_STMT_DEFINE_INT_I(5,       data_scale,     tab_all_tab_columns);
-    ORA_STMT_DEFINE_STR_I(6, 2,    nullable,       tab_all_tab_columns);
-    ORA_STMT_DEFINE_INT_I(7,       default_length, tab_all_tab_columns);
-    ORA_STMT_DEFINE_STR_I(8, 4000, data_default,   tab_all_tab_columns);
-    ORA_STMT_DEFINE_INT_I(9,       char_length,    tab_all_tab_columns);
-    ORA_STMT_DEFINE_STR_I(10, 2,   char_used,      tab_all_tab_columns);
-    
-    ORA_STMT_BIND_STR(1, schema, tab_all_tab_columns);
-    ORA_STMT_BIND_STR(2, table,  tab_all_tab_columns);
-    
+
+    ORA_STMT_DEFINE_STR  (tab_all_tab_columns, 1,  column_name, 129);
+    ORA_STMT_DEFINE_STR_I(tab_all_tab_columns, 2,  data_type, 129);
+    ORA_STMT_DEFINE_INT  (tab_all_tab_columns, 3,  data_length);
+    ORA_STMT_DEFINE_INT_I(tab_all_tab_columns, 4,  data_precision);
+    ORA_STMT_DEFINE_INT_I(tab_all_tab_columns, 5,  data_scale);
+    ORA_STMT_DEFINE_STR_I(tab_all_tab_columns, 6,  nullable, 2);
+    ORA_STMT_DEFINE_INT_I(tab_all_tab_columns, 7,  default_length);
+    ORA_STMT_DEFINE_STR_I(tab_all_tab_columns, 8,  data_default, 4000);
+    ORA_STMT_DEFINE_INT_I(tab_all_tab_columns, 9,  char_length);
+    ORA_STMT_DEFINE_STR_I(tab_all_tab_columns, 10, char_used, 2);
+    ORA_STMT_BIND_STR(tab_all_tab_columns, 1, schema);
+    ORA_STMT_BIND_STR(tab_all_tab_columns, 2, table);    
     ORA_STMT_EXECUTE(tab_all_tab_columns, 0);
 
     char definition[4096];                // buffer (on stack) in which to build column representation
@@ -175,24 +191,24 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
  order by decode(constraint_type, 'P', 1, 'U', 2, 'R', 3, 'C', 4, 5), constraint_name";
 
     int retval = EXIT_SUCCESS;
+    def->constraints = NULL;
      
     ORA_STMT_PREPARE(tab_all_constraints);
-    ORA_STMT_DEFINE_STR  (1, 129,  constraint_name,   tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(2, 2,    constraint_type,   tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(3, 129,  index_owner,       tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(4, 129,  index_name,        tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(5, 129,  ref_owner,         tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(6, 129,  ref_table,         tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(7, 4000, colstr,            tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(8, 4000, ref_colstr,        tab_all_constraints);
-    ORA_STMT_DEFINE_STR_I(9, 32767, search_condition, tab_all_constraints);
-    ORA_STMT_BIND_STR(1, schema, tab_all_constraints);
-    ORA_STMT_BIND_STR(2, table,  tab_all_constraints);
-    ORA_STMT_BIND_STR(3, schema, tab_all_constraints);
-    ORA_STMT_BIND_STR(4, table,  tab_all_constraints); 
+    ORA_STMT_DEFINE_STR  (tab_all_constraints, 1, constraint_name,  129);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 2, constraint_type,  2);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 3, index_owner,      129);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 4, index_name,       129);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 5, ref_owner,        129);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 6, ref_table,        129);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 7, colstr,           4000);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 8, ref_colstr,       4000);
+    ORA_STMT_DEFINE_STR_I(tab_all_constraints, 9, search_condition, 32767);
+    ORA_STMT_BIND_STR(tab_all_constraints, 1, schema);
+    ORA_STMT_BIND_STR(tab_all_constraints, 2, table);
+    ORA_STMT_BIND_STR(tab_all_constraints, 3, schema);
+    ORA_STMT_BIND_STR(tab_all_constraints, 4, table); 
     ORA_STMT_EXECUTE(tab_all_constraints, 0);
     
-    struct deflist *tmpdef;    
     char tmpstr[8192];
     char tmpstr_part[500];
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
@@ -247,24 +263,12 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
         }
         strcat(tmpstr, tmpstr_part);
         strcat(tmpstr, ";\n");
-         
-        // append to linked list        
-        tmpdef = malloc(sizeof(struct deflist));
-        if (tmpdef == NULL) {
-            logmsg(LOG_ERROR, "tab_all_constraints(): Unable to malloc tmpdef");
-            retval = EXIT_FAILURE;
-            goto tab_all_constraints_cleanup;
-        }
-
-        tmpdef->definition = malloc(strlen(tmpstr));
-        if (tmpdef->definition == NULL) {
-            logmsg(LOG_ERROR, "tab_all_constraitns(): Unable to malloc tmpdef->definition");
-            retval = EXIT_FAILURE;
-            goto tab_all_constraints_cleanup;
-        }
-        strcpy(tmpdef->definition, tmpstr);
         
-        deflist_append(&def->constraints, tmpdef);
+        if (deflist_append(&def->constraints, tmpstr) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "tab_all_constraints(): failed to assemble list of constraints.");
+            retval = EXIT_FAILURE;
+            goto tab_all_constraints_cleanup;
+        }
     }
     
 tab_all_constraints_cleanup:
@@ -274,10 +278,9 @@ tab_all_constraints_cleanup:
 
 int tab_all_indexes(const char *schema, const char *table, struct tabledef *def) {
 
-// index_type='BITMAP', 'NORMAL'
     const char *query = 
 "select ai.owner, ai.index_name, ai.index_type, ai.uniqueness, ai.compression, ai.prefix_length,\
- ic.column_name, ic.column_position, ic.descend as column_descend,\
+ ic.column_name, ic.descend as column_descend,\
  ie.column_expression as expression_string\
  from all_indexes ai\
  left join all_ind_columns ic on ic.index_owner=ai.owner and ic.index_name = ai.index_name\
@@ -287,25 +290,31 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
  order by ai.owner, ai.index_name, ic.column_position";
     
     int retval = EXIT_SUCCESS;
-     
+    
+    def->indexes = NULL;
+
     ORA_STMT_PREPARE(tab_all_indexes);
-    
-    ORA_STMT_DEFINE_STR  (1, 129, index_owner,     tab_all_indexes);
-    ORA_STMT_DEFINE_STR  (2, 129, index_name,      tab_all_indexes);
-    ORA_STMT_DEFINE_STR_I(3, 30,  index_type,      tab_all_indexes);
-    ORA_STMT_DEFINE_STR_I(4, 15,  index_unique,    tab_all_indexes);
-    ORA_STMT_DEFINE_STR_I(5, 15,  index_compress,  tab_all_indexes);
-    ORA_STMT_DEFINE_INT_I(6,      index_prefix,    tab_all_indexes);
-    ORA_STMT_DEFINE_STR_I(7, 129, column_name,     tab_all_indexes);
-    ORA_STMT_DEFINE_INT  (8,      column_position, tab_all_indexes);
-    ORA_STMT_DEFINE_STR_I(9, 15,  column_descend,  tab_all_indexes);
-    
-    ORA_STMT_BIND_STR(1, schema, tab_all_indexes); 
-    ORA_STMT_BIND_STR(2, table,  tab_all_indexes);
-    
+    ORA_STMT_DEFINE_STR  (tab_all_indexes, 1, index_owner,       129);
+    ORA_STMT_DEFINE_STR  (tab_all_indexes, 2, index_name,        129);
+    ORA_STMT_DEFINE_STR_I(tab_all_indexes, 3, index_type,        30);
+    ORA_STMT_DEFINE_STR_I(tab_all_indexes, 4, index_unique,      15);
+    ORA_STMT_DEFINE_STR_I(tab_all_indexes, 5, index_compress,    15);
+    ORA_STMT_DEFINE_INT_I(tab_all_indexes, 6, index_prefix);
+    ORA_STMT_DEFINE_STR_I(tab_all_indexes, 7, column_name,       129);
+    ORA_STMT_DEFINE_STR_I(tab_all_indexes, 8, column_descend,    15);
+    ORA_STMT_DEFINE_STR_I(tab_all_indexes, 9, column_expression, 4000);
+    ORA_STMT_BIND_STR(tab_all_indexes, 1, schema); 
+    ORA_STMT_BIND_STR(tab_all_indexes, 2, table);    
     ORA_STMT_EXECUTE(tab_all_indexes, 0);
     
+    char tmp_prev_index[1024] = "";
+    char tmp_next_index[1024] = "";
+    char tmp[8192];
+    char tmp_buff[500];
+
+    int tmp_prev_compress = -2;
     while (ORA_STMT_FETCH) {
+        /*
         logmsg(LOG_DEBUG, "index {");
         logmsg(LOG_DEBUG, ".. index_owner=[%s]",     ORA_VAL(index_owner));
         logmsg(LOG_DEBUG, ".. index_name=[%s]",      ORA_VAL(index_name));
@@ -317,9 +326,69 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
         logmsg(LOG_DEBUG, ".. column_position=[%d]", ORA_VAL(column_position));
         logmsg(LOG_DEBUG, ".. column_descend=[%s]",  ORA_NVL(column_descend, "N/A"));
         logmsg(LOG_DEBUG, "}");
+        */
+        snprintf(tmp_next_index, 1024, "'%s'.'%s'", ORA_VAL(index_owner), ORA_VAL(index_name));
+        if (strcmp(tmp_prev_index, tmp_next_index) != 0) {
+            if (strlen(tmp_prev_index) != 0) {                 
+                if (tmp_prev_compress < 0)
+                    strcat(tmp, ");\n");
+                else {
+                    snprintf(tmp_buff, 500, ") COMPRESS %d;\n", tmp_prev_compress); 
+                    strcat(tmp, tmp_buff);
+                }
+
+                if (deflist_append(&def->indexes, tmp) != EXIT_SUCCESS) {
+                    logmsg(LOG_ERROR, "tab_all_indexes(): failed to assemble list of indexes.");
+                    retval = EXIT_FAILURE;
+                    goto tab_all_indexes_cleanup;
+                }
+            }
+    
+            snprintf(tmp_prev_index, 1024, "'%s'.'%s'", ORA_VAL(index_owner), ORA_VAL(index_name));
+            
+            if (strcmp(ORA_NVL(index_type, "X"), "BITMAP") == 0)
+                strncpy(tmp_buff, " BITMAP ", 20);
+            else if (strcmp(ORA_NVL(index_unique, "X"), "UNIQUE") == 0)
+                strncpy(tmp_buff, " UNIQUE ", 20);
+            else
+                strncpy(tmp_buff, " ", 20);
+            
+            snprintf(tmp, 8192, "CREATE%sINDEX \"%s\".\"%s\" ON \"%s\".\"%s\"(",
+                tmp_buff, ORA_VAL(index_owner), ORA_VAL(index_name), schema, table);
+
+            tmp_prev_compress = -1;
+            if (strcmp(ORA_NVL(index_compress, "XX"), "ENABLED") == 0)
+                tmp_prev_compress = ORA_NVL(index_prefix, -1);
+            
+        } else {
+            strcat(tmp, ", ");
+        }
+    
+        if (strcmp(ORA_NVL(column_expression, "_IS_NULL_"), "_IS_NULL_") == 0)
+            snprintf(tmp_buff, 500, "\"%s\"", ORA_NVL(column_name, "???"));
+        else
+            snprintf(tmp_buff, 500, "%s", ORA_NVL(column_expression, "???"));
+        strcat(tmp_buff, (strcmp(ORA_NVL(column_descend, "?"), "DESC") == 0 ? " DESC" : ""));
+        strcat(tmp, tmp_buff); 
     }
+
+    if (tmp_prev_compress != -2) {
+        if (tmp_prev_compress == -1)
+            strcat(tmp, ");\n");
+        else {
+            snprintf(tmp_buff, 500, ") COMPRESS %d;\n", tmp_prev_compress); 
+            strcat(tmp, tmp_buff);
+        }
+    }
+    
+    if (deflist_append(&def->indexes, tmp) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "tab_all_indexes(): failed to assemble list of indexes.");
+        retval = EXIT_FAILURE;
+        goto tab_all_indexes_cleanup;
+    }
+
      
-tab_all_indexes_cleanup:    
+tab_all_indexes_cleanup:
     ORA_STMT_FREE;
     return retval;
 }
@@ -385,12 +454,20 @@ int qry_object_all_tables(const char *schema,
         col = col->next;
     }
     fwrite(");\n\n", 1, strlen(");\n\n"), fp);
-    
+
+    col = def->indexes;
+    while (col != NULL) {
+        fwrite(col->definition, 1, strlen(col->definition), fp);
+        col = col->next;
+    }
+    fwrite("\n", 1, strlen("\n"), fp);
+
     col = def->constraints;
     while(col != NULL) {
         fwrite(col->definition, 1, strlen(col->definition), fp);
-        col = col->next;   
+        col = col->next;
     }
+    fwrite("\n", 1, strlen("\n"), fp);
     
     if (fclose(fp) != 0) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to close [%s]: %d %n", fname, errno, strerror(errno));
@@ -398,13 +475,17 @@ int qry_object_all_tables(const char *schema,
         goto qry_object_all_tables_cleanup;
     }
      
-    // @todo: indexes
-    // @todo: comments
-    
 qry_object_all_tables_cleanup:
     if (def != NULL) {
-        deflist_free(def->columns);
-        deflist_free(def->constraints);
+        if (def->columns != NULL)
+            deflist_free(def->columns);
+
+        if (def->constraints != NULL)
+            deflist_free(def->constraints);
+
+        if (def->indexes != NULL)
+            deflist_free(def->indexes);
+        
         free(def);
     }
      

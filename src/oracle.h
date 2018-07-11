@@ -50,14 +50,14 @@ sword ora_stmt_free(OCIStmt *stm);
                                                         goto PROC##_cleanup;\
                                                     }
 
-#define ORA_STMT_DEFINE_STR(I, S, NAME, PROC)       char o_##NAME[S] = "\0";\
+#define ORA_STMT_DEFINE_STR(PROC, I, NAME, S)       char o_##NAME[S] = "\0";\
                                                     if (ora_stmt_define(o_stm, &o_def, I, o_##NAME, S*sizeof(char), SQLT_STR)) {\
                                                         logmsg(LOG_ERROR, "%s(): Unable to define %s", #PROC, #NAME);\
                                                         retval = EXIT_FAILURE;\
                                                         goto PROC##_cleanup;\
                                                     }
 
-#define ORA_STMT_DEFINE_STR_I(I, S, NAME, PROC)     char o_##NAME[S] = "\0";\
+#define ORA_STMT_DEFINE_STR_I(PROC, I, NAME, S)     char o_##NAME[S] = "\0";\
                                                     sb2 i_##NAME = 0;\
                                                     if (ora_stmt_define_i(o_stm, &o_def, I, o_##NAME, S*sizeof(char), SQLT_STR, (dvoid*) &i_##NAME)) {\
                                                         logmsg(LOG_ERROR, "%s(): Unable to define %s", #PROC, #NAME);\
@@ -65,14 +65,14 @@ sword ora_stmt_free(OCIStmt *stm);
                                                         goto PROC##_cleanup;\
                                                     }
 
-#define ORA_STMT_DEFINE_INT(I, NAME, PROC)          int o_##NAME = 0;\
+#define ORA_STMT_DEFINE_INT(PROC, I, NAME)          int o_##NAME = 0;\
                                                     if (ora_stmt_define(o_stm, &o_def, I, &o_##NAME, sizeof(int), SQLT_INT)) {\
                                                         logmsg(LOG_ERROR, "%s(): Unable to define %s", #PROC, #NAME);\
                                                         retval = EXIT_FAILURE;\
                                                         goto PROC##_cleanup;\
                                                     }
 
-#define ORA_STMT_DEFINE_INT_I(I, NAME, PROC)        int o_##NAME = 0;\
+#define ORA_STMT_DEFINE_INT_I(PROC, I, NAME)        int o_##NAME = 0;\
                                                     sb2 i_##NAME = 0;\
                                                     if (ora_stmt_define_i(o_stm, &o_def, I, &o_##NAME, sizeof(int), SQLT_INT, (dvoid*) &i_##NAME)) {\
                                                         logmsg(LOG_ERROR, "%s(): Unable to define %s", #PROC, #NAME);\
@@ -80,7 +80,7 @@ sword ora_stmt_free(OCIStmt *stm);
                                                         goto PROC##_cleanup;\
                                                     }
 
-#define ORA_STMT_BIND_STR(I, NAME, PROC)            OCIBind *o_bn##I = NULL;\
+#define ORA_STMT_BIND_STR(PROC, I, NAME)            OCIBind *o_bn##I = NULL;\
                                                     if (ora_stmt_bind(o_stm, &o_bn##I, I, (void*) NAME, strlen(NAME)+1, SQLT_STR)) {\
                                                         logmsg(LOG_ERROR, "%s(): Unable to bind %d", #PROC, #NAME);\
                                                         retval = EXIT_FAILURE;\
