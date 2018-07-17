@@ -175,11 +175,10 @@ tab_all_tab_columns_cleanup:
 }
 
 static int tab_all_constraints(const char *schema, const char *table, struct tabledef *def) {
-    const char *query = 
+    const char *query_template = 
 "select * from (\
  select ac.constraint_name, ac.constraint_type, ac.index_owner, ac.index_name, ac.r_owner, rc.table_name as r_table_name,\
- listagg('\"' || replace(cc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by cc.position) as colstr,\
- listagg('\"' || replace(rc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by cc.position) as r_colstr,\
+ %s\
  null as search_condition\
  from all_constraints ac\
  join all_cons_columns cc on cc.owner=ac.owner and cc.table_name=ac.table_name and cc.constraint_name=ac.constraint_name\
@@ -192,6 +191,19 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
  from all_constraints\
  where owner=:bind_owner and table_name=:bind_name and generated='USER NAME' and constraint_type='C')\
  order by decode(constraint_type, 'P', 1, 'U', 2, 'R', 3, 'C', 4, 5), constraint_name";
+
+    const char *listagg_10 = 
+"rtrim(xmlagg(xmlelement(e, cc.column_name, ',') order by cc.position).extract('//text()').getclobval(), ',') as colstr,\
+ rtrim(xmlagg(xmlelement(e, rc.column_name, ',') order by rc.position).extract('//text()').getclobval(), ',') as r_colstr,";
+
+    const char *listagg_11 = 
+"listagg('\"' || replace(cc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by cc.position) as colstr,\
+ listagg('\"' || replace(rc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by rc.position) as r_colstr,";
+
+    char query[4096];
+    snprintf(query, 4096, query_template, (g_conf._server_version < 1102 ? listagg_10 : listagg_11));
+
+    logmsg(LOG_DEBUG, "QUERY_CONSTRAINT=[%s]", query);
 
     int retval = EXIT_SUCCESS;
     def->constraints = NULL;
