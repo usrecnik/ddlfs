@@ -926,13 +926,13 @@ static int qry_objects_filesize(t_fsentry *schema, t_fsentry *type) {
 int qry_objects(t_fsentry *schema, t_fsentry *type) {
     int retval = EXIT_SUCCESS;
     char query[500] = "select \
-o.object_name, to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t_modified \
+o.object_name, to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t_modified, o.status \
 from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type";
 
     OCIStmt   *o_stm = NULL;
-    OCIDefine *o_def[2] = {NULL, NULL};
+    OCIDefine *o_def[3] = {NULL, NULL, NULL};
     OCIBind   *o_bnd[2] = {NULL, NULL};
-    char      *o_sel[2] = {NULL, NULL};
+    char      *o_sel[3] = {NULL, NULL, NULL};
 
     char *schema_name = strdup(schema->fname);
     char *type_name = strdup(type->fname);
@@ -982,7 +982,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
 
     vfs_entry_free(type, 1);
 
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 3; i++)
         if ((o_sel[i] = malloc(256*sizeof(char))) == NULL) {
             logmsg(LOG_ERROR, "Unable to allocate memory for sel[%d]", i);
             return EXIT_FAILURE;
@@ -999,6 +999,11 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
     }
 
     if (ora_stmt_define(o_stm, &o_def[1], 2, (void*) o_sel[1], 256*sizeof(char), SQLT_STR)) {
+        retval = EXIT_FAILURE;
+        goto qry_objects_cleanup;
+    }
+
+    if (ora_stmt_define(o_stm, &o_def[2], 3, (void*) o_sel[2], 256*sizeof(char), SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
     }
@@ -1042,7 +1047,8 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         if (g_conf.lowercase)
             str_lower(fname);
         
-        t_fsentry *entry = vfs_entry_create('F', 
+        char ftype = (strcmp(o_sel[2], "VALID") == 0 ? 'F' : 'I');
+        t_fsentry *entry = vfs_entry_create(ftype, 
             fname,
             t_modified, 
             t_modified);
@@ -1070,7 +1076,7 @@ qry_objects_cleanup:
     if (o_stm != NULL)
         ora_check(OCIHandleFree(o_stm, OCI_HTYPE_STMT));
 
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 3; i++)
         if (o_sel[i] != NULL)
             free(o_sel[i]);
 

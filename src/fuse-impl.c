@@ -153,8 +153,12 @@ int fs_getattr( const char *path, struct stat *st )
     } else {
         if (depth == DEPTH_MAX && strcasecmp(part[DEPTH_TYPE], "TABLE") == 0)
             st->st_mode = S_IFREG | 0444;
-        else
-            st->st_mode = S_IFREG | 0644;
+        else {
+            if (entry->ftype == 'F')
+                st->st_mode = S_IFREG | 0744;
+            else 
+                st->st_mode = S_IFREG | 0644;
+        }
         
         st->st_nlink = 1;
         st->st_size = tmp_st.st_size;
