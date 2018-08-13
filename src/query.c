@@ -748,18 +748,9 @@ int qry_schemas() {
     char *bind_in[100], *bind_like[100];
     int bind_in_i = 0, bind_like_i = 0;
     int pos_in, pos_like;
-    OCIStmt   *o_stm = NULL;
-    OCIDefine *o_def = NULL;
-    char      *o_sel = malloc(256 * sizeof(char));
-    OCIBind   *o_bnd[200];
     int        o_bnd_idx = 0;
     char tmp[50]; // for converting int to char*
     
-    if (o_sel == NULL) {
-        logmsg(LOG_ERROR, "Unable to malloc o_sel @ qry_schemas().");
-        return EXIT_FAILURE;
-    }
-        
     // build query
     pos_in = 0;
     pos_like = 0;
@@ -790,7 +781,7 @@ int qry_schemas() {
         }
     }
 
-    str_append(&query, "SELECT username FROM all_users WHERE");
+    str_append(&query, "SELECT username, to_char(created, 'yyyy-mm-dd hh24:mi:ss') as created FROM all_users WHERE");
     if (pos_in != 0 && pos_like != 0) {
         str_append(&query, " username IN (");
         str_append(&query, query_in);
@@ -810,37 +801,50 @@ int qry_schemas() {
     
     // logmsg(LOG_DEBUG, "query=[%s]", query);
     // prepare and execute sql statement
-    if (ora_stmt_prepare(&o_stm, query)) {
-        retval = EXIT_FAILURE;
-        goto qry_schemas_cleanup;
-    }
-    if (ora_stmt_define(o_stm, &o_def, 1, (void*) o_sel, 256*sizeof(char), SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_schemas_cleanup;
-    }
+
+    ORA_STMT_PREPARE (qry_schemas);
+    ORA_STMT_DEFINE_STR_I(qry_schemas, 1, username, 300);
+    ORA_STMT_DEFINE_STR_I(qry_schemas, 2, created,  30);
 
     for (int i = 0; i < bind_in_i; i++) {
-        ora_stmt_bind(o_stm, &o_bnd[o_bnd_idx], o_bnd_idx+1, bind_in[i], strlen(bind_in[i])+1, SQLT_STR);
         o_bnd_idx++;
+        ORA_STMT_BIND_STR(qry_schemas, o_bnd_idx, bind_in[i]);         
+        //o_bnd_idx++;
     }
 
     for (int i = 0; i < bind_like_i; i++) {
-        ora_stmt_bind(o_stm, &o_bnd[o_bnd_idx], o_bnd_idx+1, bind_like[i], strlen(bind_like[i])+1, SQLT_STR);
         o_bnd_idx++;
+        ORA_STMT_BIND_STR(qry_schemas, o_bnd_idx, bind_like[i]);
     }
 
-    if (ora_stmt_execute(o_stm, 0)) {
-        retval = EXIT_FAILURE;
-        goto qry_schemas_cleanup;
-    }    
-    
+    ORA_STMT_EXECUTE(qry_schemas, 0);
+     
     vfs_entry_free(g_vfs, 1);
     
-    // loop through query results    
-    while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
+    while (ORA_STMT_FETCH) {
         if (g_conf.lowercase)
-            str_lower((char*) o_sel);
-        t_fsentry *entry = vfs_entry_create('D', o_sel, time(NULL), time(NULL));
+            str_lower((char*) o_username);
+    
+        // convert created date
+        struct tm *temptime = malloc(sizeof(struct tm));
+        if (temptime == NULL) {
+            logmsg(LOG_ERROR, "qry_schemas(): unable to allocate memory for temptime");
+            retval = EXIT_FAILURE;
+            goto qry_schemas_cleanup;
+        }
+        memset(temptime, 0, sizeof(struct tm));
+        char* xx = strptime(ORA_VAL(created), "%Y-%m-%d %H:%M:%S", temptime);
+        if (xx == NULL || *xx != '\0') {
+            logmsg(LOG_ERROR, "qry_schemas(): unable to parse created date=[%s] for user=[%s]", ORA_VAL(username), ORA_VAL(created));
+            retval = EXIT_FAILURE;
+            free(temptime);
+            goto qry_schemas_cleanup;
+        }                                                                            
+        time_t created_time = timegm(temptime);
+        free(temptime);
+        // end of date conversion
+        
+        t_fsentry *entry = vfs_entry_create('D', o_username, created_time, created_time);
         vfs_entry_add(g_vfs, entry);
     }
 
@@ -886,6 +890,22 @@ int qry_types(t_fsentry *schema) {
         NULL
     };
 
+    char *fixed_date_str = "1990-01-01 01:01:01";
+    struct tm *temptime = malloc(sizeof(struct tm));
+    if (temptime == NULL) {
+        logmsg(LOG_ERROR, "qry_types(): unable to allocate memory for temptime");
+        return EXIT_FAILURE;
+    }
+    memset(temptime, 0, sizeof(struct tm));
+    char* xx = strptime(fixed_date_str, "%Y-%m-%d %H:%M:%S", temptime);
+    if (xx == NULL || *xx != '\0') {
+        logmsg(LOG_ERROR, "qry_types(): unable to parse fixed date=[%s]", fixed_date_str);
+        free(temptime);
+        return EXIT_FAILURE;
+    }
+    time_t fixed_date = timegm(temptime);
+    free(temptime);
+    
     for (int i = 0; types[i] != NULL; i++) {
         char *type = strdup(types[i]);
         if (type == NULL) {
@@ -897,13 +917,13 @@ int qry_types(t_fsentry *schema) {
             str_lower(type);
         else
             str_upper(type);
-    
-        vfs_entry_add(schema, vfs_entry_create('D', type,  time(NULL), time(NULL)));
+        
+        vfs_entry_add(schema, vfs_entry_create('D', type, fixed_date, fixed_date));
         free(type);
     }
-
+    
     vfs_entry_sort(schema);    
-
+    
     return EXIT_SUCCESS;
 }
 
