@@ -927,7 +927,7 @@ int qry_objects(t_fsentry *schema, t_fsentry *type) {
     int retval = EXIT_SUCCESS;
     char query[500] = "select \
 o.object_name, to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t_modified, o.status \
-from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type";
+from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type and generated='N'";
 
     OCIStmt   *o_stm = NULL;
     OCIDefine *o_def[3] = {NULL, NULL, NULL};
@@ -1046,7 +1046,19 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
          
         if (g_conf.lowercase)
             str_lower(fname);
-        
+
+        // https://stackoverflow.com/questions/9847288/is-it-possible-to-use-in-a-filename
+        char *tmp = fname;
+        int has_slash = 0;
+        while (*tmp != '\0')
+            if (*(tmp++) == '/') 
+                has_slash = 1;
+
+        if (has_slash) {
+            logmsg(LOG_ERROR, "Skipping object named [%s], because it has '/' in the name.", fname);
+            continue;
+        }
+
         char ftype = (strcmp(o_sel[2], "VALID") == 0 ? 'F' : 'I');
         t_fsentry *entry = vfs_entry_create(ftype, 
             fname,
