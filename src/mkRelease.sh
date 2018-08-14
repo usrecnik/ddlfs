@@ -7,7 +7,7 @@ PKG_ARCH='amd64'
 PKG_MAIN='"Urh Srecnik" <urh.srecnik@abakus.si>'
 PKG_DESC='Filesystem which represents Oracle Database objects as their DDL stored in .sql files.'
 PKG_FULL_NAME="${PKG_NAME}-${PKG_VERS}"
-
+INSTANT_CLIENT_PATH="$(cat Makefile  | grep '^export LD_LIBRARY_PATH' | cut -d'=' -f2)"
 
 function proc_copy() {
     mkdir -p ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/
@@ -18,11 +18,16 @@ function proc_copy() {
     chmod a+x ../target/${PKG_FULL_NAME}/usr/bin/ddlfs
     chmod a+x ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ddlfs
     cp ../docs/ddlfs.man ../target/${PKG_FULL_NAME}/usr/share/man/man1/ddlfs.1
-    unzip ../../instantclient_12_2/instantclient-basic-linux.x64-12.2.0.1.0.zip -d ../target/${PKG_FULL_NAME}/usr/lib/ddlfs
-    mv -v ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/instantclient_12_2 ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
+    unzip ${INSTANT_CLIENT_PATH}/instantclient-basic-linux.x64-*.zip -d ../target/${PKG_FULL_NAME}/usr/lib/ddlfs
+    mv -v ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/instantclient_* ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
 }
 
 function proc_deb() {
+    echo ' '
+    echo 'Building .deb'
+    echo '-------------'
+    echo ' '
+    
     readonly l_cf="../target/${PKG_FULL_NAME}/DEBIAN/control"
     readonly l_cp="../target/${PKG_FULL_NAME}/DEBIAN/copyright"
     mkdir -p "$(dirname "$l_cf")"
@@ -48,6 +53,11 @@ function proc_deb() {
 }
 
 function proc_rpm() {
+    echo ' '
+    echo 'Building .rpm'
+    echo '-------------'
+    echo ' '
+    
     readonly l_spec="../target/${PKG_FULL_NAME}.spec"
     
     > "$l_spec"
@@ -66,7 +76,7 @@ function proc_rpm() {
     echo '%dir "/usr/lib/ddlfs/ic/"'    >> "$l_spec" 
     
     pushd "../target/${PKG_FULL_NAME}/"
-    find usr/ -type f | \
+    find usr/ \( -type f -o -type l \) | \
     while read l_line
     do
         echo "\"/${l_line}\"" >> "../${PKG_FULL_NAME}.spec"

@@ -1,4 +1,4 @@
-export LD_LIBRARY_PATH=../../instantclient_12_2/
+export LD_LIBRARY_PATH=../../instantclient_18_3/
 
 all:
 	@mkdir -p ../target
