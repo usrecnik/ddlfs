@@ -94,12 +94,27 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
         if (strcasecmp(suffix, ".JAVA") != 0 && strcasecmp(suffix, ".SQL") != 0)
             return NULL;
     }
+
+    if (path[DEPTH_TYPE] != NULL) {
+        char *c = path[DEPTH_TYPE];
+        while (*c != '\0') {
+            if ((*c >= 'A' && *c <= 'Z') ||
+                (*c >= 'a' && *c <= 'z') ||
+                (*c == '_')) {
+                c++;
+                continue;
+            }
+            return NULL;
+        }
+    }
+    //---
     
     t_fsentry *entries[DEPTH_MAX] = {NULL, NULL, NULL};
     for (int i = 0; i < DEPTH_MAX; i++) {
         if (path[i] == NULL) {
-            if (loadFound)
+            if (loadFound) {
                 qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
+            }
 
             return entries[i-1];
         }
