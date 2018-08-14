@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "query_tables.h"
+#include "util.h"
 #include "config.h"
 #include "logging.h"
 #include "oracle.h"
@@ -54,23 +55,37 @@ static void deflist_free(struct deflist *curr) {
 
 static int tab_all_tables(const char *schema, const char *table, struct tabledef *def) {
     const char *query = 
-"select \"TEMPORARY\" from all_tables\
- where owner=:bind_owner and table_name=:bind_name";
+"select t.\"TEMPORARY\", o.last_ddl_time\
+ from all_objects o\
+ left join all_tables t on o.owner=t.owner and o.object_name = t.table_name\
+ where o.owner=:bind_owner\
+ and o.object_name=:bind_name\
+ and o.object_type='TABLE'";
     
     int retval = EXIT_SUCCESS;
 
     ORA_STMT_PREPARE(tab_all_tables);
     ORA_STMT_DEFINE_STR_I(tab_all_tables, 1, temporary, 2);
+    ORA_STMT_DEFINE_STR  (tab_all_tables, 2, ddl_time, 30);
     ORA_STMT_BIND_STR(tab_all_tables, 1, schema);
     ORA_STMT_BIND_STR(tab_all_tables, 2, table);
     ORA_STMT_EXECUTE(tab_all_tables, 0);
     if (ORA_STMT_FETCH) {
-        def->exists = 'Y';    
-        def->temporary = (strcmp(ORA_NVL(temporary, "N"), "Y") == 0) ? 'Y' : 'N';
+        if (strcmp(ORA_NVL(temporary, "X"), "X") == 0) {
+            def->exists = 'N';                                                                                              
+            def->temporary = 'N';                                                                                           
+            def->last_ddl_time = strdup("1990-01-01 01:01:02");
+        } else {
+            def->exists = 'Y';    
+            def->temporary = (strcmp(ORA_NVL(temporary, "N"), "Y") == 0) ? 'Y' : 'N';
+            def->last_ddl_time = strdup(ORA_VAL(ddl_time));
+        }
     } else {
         def->exists = 'N';
         def->temporary = 'N';
+        def->last_ddl_time = strdup("1990-01-01 01:01:02");
     }
+
 tab_all_tables_cleanup:
     ORA_STMT_FREE;
     return retval;
@@ -412,11 +427,16 @@ int qry_object_all_tables(const char *schema,
                           time_t *last_ddl_time) {
     
     int retval = EXIT_SUCCESS;
-    FILE *fp;
+    FILE *fp = NULL;
     char temp[4096];
     struct tabledef *def = malloc(sizeof(struct tabledef));
-    struct deflist *col;
+    struct deflist *col = NULL;
     int colcnt = 0;
+
+    def->last_ddl_time = NULL;
+    def->columns = NULL;
+    def->constraints = NULL;
+    def->indexes = NULL;
 
     if (def == NULL) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): unable to allocate memory for tabledef.");
@@ -428,6 +448,9 @@ int qry_object_all_tables(const char *schema,
         retval = EXIT_FAILURE;
         goto qry_object_all_tables_cleanup;
     }
+
+    if (tfs_validate(fname, def->last_ddl_time, last_ddl_time) == EXIT_SUCCESS)
+        goto qry_object_all_tables_cleanup;
     
     if (tab_all_tab_columns(schema, table, def) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): tab_all_tab_columns() failed.");
@@ -490,11 +513,14 @@ int qry_object_all_tables(const char *schema,
 
 
 qry_object_all_tables_cleanup:
-
     if (fp != NULL && fclose(fp) != 0) 
         logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to close [%s]: %d %n", fname, errno, strerror(errno));
-    
+
     if (def != NULL) {
+
+        if (def->last_ddl_time != NULL)
+            free(def->last_ddl_time);
+
         if (def->columns != NULL)
             deflist_free(def->columns);
 
@@ -503,11 +529,9 @@ qry_object_all_tables_cleanup:
 
         if (def->indexes != NULL)
             deflist_free(def->indexes);
-        
+
         free(def);
     }
-     
     return retval;
 }
-
 

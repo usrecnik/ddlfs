@@ -6,6 +6,7 @@ struct deflist {
 struct tabledef {
     char exists; // 'Y' or 'N'
     char temporary; // 'Y' or 'N'
+    char *last_ddl_time;
     struct deflist *columns;
     struct deflist *constraints;
     struct deflist *indexes;

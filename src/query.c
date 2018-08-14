@@ -701,12 +701,14 @@ int qry_object(char *schema,
         logmsg(LOG_ERROR, "qry_object() - unable to convert fs type to ora type.");
         if (object_schema != NULL) free(object_schema);
         if (object_type != NULL) free(object_type);
-        if (object_name != NULL) free(object_name); 
+        if (object_name != NULL) free(object_name);
         return EXIT_FAILURE;
     }
     
     is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
     is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
+
+    // @todo - check cache
 
     if (strcmp(object_type, "TABLE") == 0)
         qry_object_all_tables(object_schema, object_name, *fname, &last_ddl_time);
