@@ -819,7 +819,7 @@ int qry_schemas() {
 
     ORA_STMT_EXECUTE(qry_schemas, 0);
      
-    vfs_entry_free(g_vfs, 1);
+    // vfs_entry_free(g_vfs, 1);
     
     while (ORA_STMT_FETCH) {
         if (g_conf.lowercase)
@@ -845,12 +845,16 @@ int qry_schemas() {
         // end of date conversion
         
         t_fsentry *entry = vfs_entry_create('D', o_username, created_time, created_time);
-        vfs_entry_add(g_vfs, entry);
+        t_fsentry *exists = vfs_entry_search(g_vfs, entry->fname);
+        if (exists == NULL)
+            vfs_entry_add(g_vfs, entry);
     }
 
     t_fsentry *ddllog = vfs_entry_create('F', "ddlfs.log", time(NULL), time(NULL));
-    vfs_entry_add(g_vfs, ddllog);
-
+    t_fsentry *exists = vfs_entry_search(g_vfs, ddllog->fname);
+    if (exists == NULL)
+        vfs_entry_add(g_vfs, ddllog);
+    
     vfs_entry_sort(g_vfs);
 
 
@@ -957,7 +961,12 @@ from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type and ge
     char *schema_name = strdup(schema->fname);
     char *type_name = strdup(type->fname);
     char *suffix = NULL;
-    
+
+    // free cached vfs contents of the other (previous) schema...
+    if ( (g_vfs_last_schema != NULL) && (g_vfs_last_schema != schema))
+        vfs_entry_free(g_vfs_last_schema, 1);
+    g_vfs_last_schema = schema;
+
     if (type_name == NULL || schema_name == NULL) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to strdup type_name and/or schema_name");
         if (type_name != NULL)

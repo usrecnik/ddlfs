@@ -28,6 +28,7 @@ int main(int argc, char *argv[]) {
 
     logmsg(LOG_INFO, "DDL Filesystem v%s for Oracle Database, FUSE v%d.%d", DDLFS_VERSION, FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
     
+    g_vfs_last_schema = NULL;
     g_conf.mountpoint = realpath(argv[argc-1], NULL);
     logmsg(LOG_DEBUG, ".. mounting at [%s]", g_conf.mountpoint);
 

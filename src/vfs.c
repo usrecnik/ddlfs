@@ -35,7 +35,7 @@ t_fsentry* vfs_entry_create(const char type,
 void vfs_entry_free(t_fsentry *entry, int children_only) {
     for (int i = 0; i < entry->count; i++)
         vfs_entry_free(entry->children[i], 0);
-    
+        
     entry->count = 0;
     if (!children_only) {
         if (entry->children != NULL)
@@ -95,7 +95,7 @@ t_fsentry* _vfs_search(t_fsentry *entry, const char *fname, int min, int max, in
         return _vfs_search(entry, fname, min, pos, depth+1);
 }
 
-// search among childrent of entry
+// search among children of entry
 t_fsentry* vfs_entry_search(t_fsentry *entry, const char *fname) {
     return _vfs_search(entry, fname, 0, entry->count, 0);
 }

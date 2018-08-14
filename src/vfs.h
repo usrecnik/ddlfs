@@ -15,6 +15,7 @@ typedef struct s_fsentry {
 } t_fsentry;
 
 t_fsentry *g_vfs;
+t_fsentry *g_vfs_last_schema;
 
 
 t_fsentry* vfs_entry_create(const char type, 
