@@ -203,8 +203,6 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
     char query[4096];
     snprintf(query, 4096, query_template, (g_conf._server_version < 1102 ? listagg_10 : listagg_11));
 
-    logmsg(LOG_DEBUG, "QUERY_CONSTRAINT=[%s]", query);
-
     int retval = EXIT_SUCCESS;
     def->constraints = NULL;
      

@@ -1,4 +1,4 @@
-#define _DEFAULT_SOURCE // #define _BSD_SOURCE was deprecated with _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
 
@@ -85,6 +85,16 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
         return g_vfs;
     }
 
+    // don't bother looking for files which cannot possibly exist (e.g. '.Trash', '.hg', ...)
+    if (path[DEPTH_OBJECT] != NULL) {
+        char *suffix = strrchr(path[DEPTH_OBJECT], '.');
+        if (suffix == NULL)
+            return NULL; 
+        
+        if (strcasecmp(suffix, ".JAVA") != 0 && strcasecmp(suffix, ".SQL") != 0)
+            return NULL;
+    }
+    
     t_fsentry *entries[DEPTH_MAX] = {NULL, NULL, NULL};
     for (int i = 0; i < DEPTH_MAX; i++) {
         if (path[i] == NULL) {
