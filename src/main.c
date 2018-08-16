@@ -23,6 +23,7 @@
 
 int main(int argc, char *argv[]) {
     memset(&g_conf, 0, sizeof(g_conf));
+    g_conf.dbro = -1;
     g_conf.loglevel = "INFO";
     g_ddl_log_time = time(NULL);
 
@@ -60,6 +61,16 @@ int main(int argc, char *argv[]) {
         logmsg(LOG_ERROR, "Unable to connect to database.");
         return EXIT_SUCCESS;
     }
+
+    if (g_conf.dbro == -1) {
+        logmsg(LOG_DEBUG, "neither dbro nor dbrw parameter given, thus trying 'select open_mode from v$database'");
+        g_conf.dbro = ora_get_open_mode();
+        if (g_conf.dbro == -1) {
+            logmsg(LOG_DEBUG, ".. unable to query v$database, assuming the database is opened as read/write");
+            g_conf.dbro = 0;
+        }
+    }
+    logmsg(LOG_DEBUG, "dbro=[%d]", g_conf.dbro);
 
     if (tfs_mkdir() != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "Unable to initialize temp directory (%s)", g_conf.temppath);

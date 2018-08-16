@@ -13,6 +13,7 @@ struct s_global_config {
     char *database;
     char *schemas;
     char *pdb;
+    int   dbro;
     int   keepcache;
     int   lowercase;
     int   filesize;

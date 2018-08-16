@@ -14,6 +14,7 @@ struct s_connection {
     OCIServer*  srv;
     OCISvcCtx*  svc;
     OCISession* ses;
+    int         read_only; // 0 => rw, 1=ro (select open_mode from v$database)
 } g_connection;
 
 // @todo - this should be "static"
@@ -40,6 +41,11 @@ sword ora_stmt_execute(OCIStmt *stm, ub4 iters);
 sword ora_stmt_fetch(OCIStmt *stm);
 
 sword ora_stmt_free(OCIStmt *stm);
+
+
+// query: select open_mode from v$database
+// @return: -1=error (probably due to insuficient privileges), 0=rw, 1=ro
+int ora_get_open_mode();
 
 
 #define ORA_STMT_PREPARE(PROC)                      OCIStmt *o_stm = NULL;\

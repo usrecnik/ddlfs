@@ -24,6 +24,8 @@ static struct fuse_opt ddlfs_opts[] = {
     MYFS_OPT("pdb=%s",      pdb,      1),
     MYFS_OPT("lowercase",   lowercase, 1),
     MYFS_OPT("nolowercase", lowercase, 0),
+    MYFS_OPT("dbro",        dbro,      1),
+    MYFS_OPT("dbrw",        dbro,      0),
     MYFS_OPT("keepcache",   keepcache, 1),
     MYFS_OPT("nokeepcache", keepcache, 0),
       
@@ -123,6 +125,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     logmsg(LOG_DEBUG, ".. filesize : [%d]", g_conf.filesize);
     logmsg(LOG_DEBUG, ".. keepcache: [%d]", g_conf.keepcache);
     logmsg(LOG_DEBUG, ".. pdb      : [%s]", g_conf.pdb);
+    logmsg(LOG_DEBUG, ".. dbro     : [%d]", g_conf.dbro);
     logmsg(LOG_DEBUG, ".");
     
     return args;

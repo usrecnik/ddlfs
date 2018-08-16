@@ -54,6 +54,26 @@ sword ora_check(sword status) {
     }
     return status;
 }
+ 
+// @return: -1=error, 0=rw, 1=ro
+int ora_get_open_mode() {
+    const char *query = "select open_mode from v$database";
+    int retval = -1;
+
+    ORA_STMT_PREPARE(ora_get_open_mode);
+    ORA_STMT_DEFINE_STR(ora_get_open_mode, 1, open_mode, 30);
+    ORA_STMT_EXECUTE(ora_get_open_mode, 1);
+    logmsg(LOG_DEBUG, "open_mode=[%s]", ORA_VAL(open_mode));
+
+    if (strcmp(ORA_VAL(open_mode), "READ ONLY"))
+        retval = 1;
+    else
+        retval = 0;
+    
+ora_get_open_mode_cleanup:
+    ORA_STMT_FREE;
+    return retval;
+}
 
 int ora_connect(char* username, char* password, char* database) {
     sword r;
@@ -164,6 +184,7 @@ int ora_connect(char* username, char* password, char* database) {
     }
 
     logmsg(LOG_INFO, ".. connected to database server.");
+
     return EXIT_SUCCESS;
 }
 
