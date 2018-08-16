@@ -43,6 +43,17 @@ static int tfs_getldt_fn(const char *cache_fn, char **meta_fn) {
     return EXIT_SUCCESS;
 }
 
+
+static inline int tfs_fwrite(const void *ptr, size_t size, FILE *stream) {
+    int len = fwrite(ptr, 1, size, stream);
+    if (len != size) {
+        logmsg(LOG_ERROR, "tfs_fwrite() - Unable to write to meta file");
+        fclose(stream);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 int tfs_setldt(const char *path, time_t last_ddl_time) {
     // I have considered saving last_ddl_time as user extended attribute of file on filesystems which supports this
     // (most do, but not all of them). Problem with this approach is that even if fs supports this feature, it may
@@ -60,12 +71,21 @@ int tfs_setldt(const char *path, time_t last_ddl_time) {
         return EXIT_FAILURE;
     }
 
-    int len = fwrite(&last_ddl_time, 1 , sizeof(time_t), fp);
+/*    int len = fwrite(&last_ddl_time, 1 , sizeof(time_t), fp);
     if (len != sizeof(time_t)) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to write to meta file [%s]", meta_fn);
         fclose(fp);
         return EXIT_FAILURE;
     }
+*/
+    if (tfs_fwrite(&last_ddl_time, sizeof(time_t), fp) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
+
+    if (tfs_fwrite(&g_conf._mount_pid, sizeof(pid_t), fp) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
+
+    if (tfs_fwrite(&g_conf._mount_stamp, sizeof(time_t), fp) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
 
     if (fclose(fp) != 0) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to close meta file [%s]", meta_fn);
@@ -77,7 +97,7 @@ int tfs_setldt(const char *path, time_t last_ddl_time) {
     return EXIT_SUCCESS;
 }
 
-int tfs_getldt(const char *path, time_t *last_ddl_time) {
+int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t *mount_stamp) {
     
     char *meta_fn = NULL;
     if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
@@ -93,7 +113,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time) {
 
     int len = fread(last_ddl_time, 1, sizeof(time_t), fp);
     if (len != sizeof(time_t)) {
-        logmsg(LOG_ERROR, "tfs_getldf - unable to read meta file [%s], got [%d] bytes, expected [%d]", meta_fn, len, sizeof(time_t));
+        logmsg(LOG_ERROR, "tfs_getldf - unable to read meta file [%s], field 1,  got [%d] bytes, expected [%d]", meta_fn, len, sizeof(time_t));
         if (ferror(fp) != 0) {
             logmsg(LOG_ERROR, "tfs_getldf - .. ERROR");
         }  else {
@@ -101,6 +121,32 @@ int tfs_getldt(const char *path, time_t *last_ddl_time) {
         }
         fclose(fp);
         return EXIT_FAILURE;
+    }
+
+    if (mount_pid != NULL && mount_stamp != NULL) {
+        len = fread(mount_pid, 1, sizeof(pid_t), fp);
+        if (len != sizeof(pid_t)) {
+            logmsg(LOG_ERROR, "tfs_getldf - unable to read meta file [%s], field 2, got [%d] bytes, expected [%d]", meta_fn, len, sizeof(pid_t));
+            if (ferror(fp) != 0) {
+                logmsg(LOG_ERROR, "tfs_getldf - .. ERROR");
+            }  else {
+                logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
+            }
+            fclose(fp);
+            return EXIT_FAILURE;
+        }
+
+        len = fread(mount_stamp, 1, sizeof(time_t), fp);
+        if (len != sizeof(time_t)) {
+            logmsg(LOG_ERROR, "tfs_getldf - unable to read meta file [%s], field 3, got [%d] bytes, expected [%d]", meta_fn, len, sizeof(time_t));
+            if (ferror(fp) != 0) {
+                logmsg(LOG_ERROR, "tfs_getldf - .. ERROR");
+            }  else {
+                logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
+            }   
+            fclose(fp);
+            return EXIT_FAILURE;
+        }
     }
     
     if (fclose(fp) != 0) {
@@ -138,6 +184,39 @@ int tfs_rmfile(const char *cache_fn) {
     return retval;
 }
 
+/**
+ * It only makes sense to check this when dbro=1
+ * @return EXIT_SUCCESS: file is up2date, EXIT_FAILURE: file is outdated
+ * */
+int tfs_quick_validate(const char *path) {
+
+    char *meta_fn = NULL;
+    if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "tfs_setldf - unable to determine meta file for cache file [%s]", path);
+        return EXIT_FAILURE;
+    }
+    
+    if (access(meta_fn, F_OK) == -1) {
+        logmsg(LOG_DEBUG, "tfs_quick_validate - cache file [%s] does not yet exist.", meta_fn);
+        return EXIT_FAILURE;
+    }
+
+    time_t last_ddl_time = 0;
+    pid_t mount_pid = 0;
+    time_t mount_stamp = 0;
+
+    if (tfs_getldt(meta_fn, &last_ddl_time, &mount_pid, &mount_stamp) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "tfs_quick_validate() - unable to obtain last mount pid & stamp from [%s]", meta_fn);
+        return EXIT_FAILURE;
+    }
+
+    if (mount_pid == g_conf._mount_pid && mount_stamp == g_conf._mount_stamp) {
+        logmsg(LOG_DEBUG, "tfs_quick_validate() - validated [%s]", meta_fn);
+        return EXIT_SUCCESS;
+    }
+    return EXIT_FAILURE;
+}
+
 int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual_time) {
     
     struct tm *temptime = malloc(sizeof(struct tm));
@@ -165,7 +244,7 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
         return EXIT_FAILURE;
     }
 
-    if (tfs_getldt(cache_fn, &cached_time) != EXIT_SUCCESS) {
+    if (tfs_getldt(cache_fn, &cached_time, NULL, NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_validate - unable to read cached last_ddl_time for [%s]!", cache_fn);
         return EXIT_FAILURE;
     }

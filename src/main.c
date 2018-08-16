@@ -36,12 +36,13 @@ int main(int argc, char *argv[]) {
     logmsg(LOG_DEBUG, " ");
     logmsg(LOG_DEBUG, "-> mount <-");
         
+logmsg(LOG_DEBUG, "DBG0");
     struct fuse_args args = parse_arguments(argc, argv);
     if (args.argc == -1) {
         logmsg(LOG_ERROR, "Missing or invalid parameters [%d], exiting.", args.argc);
         return 1;
     }
-    
+logmsg(LOG_DEBUG, "DBG1");    
     // force single-threaded mode
     fuse_opt_add_arg(&args, "-s");
 

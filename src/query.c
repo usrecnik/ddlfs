@@ -708,29 +708,30 @@ int qry_object(char *schema,
     is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
     is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
 
-    // @todo - check cache
-
-    if (strcmp(object_type, "TABLE") == 0)
-        qry_object_all_tables(object_schema, object_name, *fname, &last_ddl_time);
-    else     
-        qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
+    if (g_conf.dbro == 0 || (g_conf.dbro == 1 && tfs_quick_validate(*fname) != EXIT_SUCCESS)) {
+        logmsg(LOG_DEBUG, "FULL OBJECT LOAD %s.%s", object_schema, object_name);
+        if (strcmp(object_type, "TABLE") == 0)
+            qry_object_all_tables(object_schema, object_name, *fname, &last_ddl_time);
+        else     
+            qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
     
-    // set standard file attributes on cached file (atime & mtime)
-    newtime.actime = time(NULL);
-    newtime.modtime = 0; // important. If this changes to anything else, we know that a write occured on
-                         // underlying filesystem. (if file was opened as R/W, that does not mean it actually changed
-                         // and that we need to execute DDL upon process closing it)
-    if (utime(*fname, &newtime) == -1) {
-        logmsg(LOG_ERROR, "qry_object() - unable to reset file modification time!");
-        retval = EXIT_FAILURE;
-    }
 
-    // set extended file attribute on cache file (last_ddl_time)
-    if (tfs_setldt(*fname, last_ddl_time) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "qry_object() - unable to set last_ddl_time on [%s], caching won't work (= disabled)", *fname);
-        // this is not a fatal error - it should only have impact on performance, not functionality.
-    } else {
-        // (this si too verbose) logmsg(LOG_DEBUG, "qry_object() - set LDT for [%s] to [%d]", *fname, last_ddl_time);
+        // set standard file attributes on cached file (atime & mtime)
+        newtime.actime = time(NULL);
+        newtime.modtime = 0; // important. If this changes to anything else, we know that a write occured on
+                             // underlying filesystem. (if file was opened as R/W, that does not mean it actually changed
+                             // and that we need to execute DDL upon process closing it)
+        if (utime(*fname, &newtime) == -1) {
+            logmsg(LOG_ERROR, "qry_object() - unable to reset file modification time!");
+            retval = EXIT_FAILURE;
+        }
+
+        if (tfs_setldt(*fname, last_ddl_time) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "qry_object() - unable to set last_ddl_time on [%s], caching won't work (= disabled)", *fname);
+            // this is not a fatal error - it should only have impact on performance, not functionality.
+        } else {
+            // (this si too verbose) logmsg(LOG_DEBUG, "qry_object() - set LDT for [%s] to [%d]", *fname, last_ddl_time);
+        }
     }
     
     // cleanup

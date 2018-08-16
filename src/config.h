@@ -19,6 +19,9 @@ struct s_global_config {
     int   filesize;
     char *loglevel;
     int   _server_version;
+
+    pid_t  _mount_pid;
+    time_t _mount_stamp;
 } g_conf;
 
 

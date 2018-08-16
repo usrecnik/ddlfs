@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fuse.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "logging.h"
 #include "config.h"
@@ -112,7 +114,10 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
         g_conf.temppath = calloc(10, sizeof(char));
         strcpy(g_conf.temppath, "/tmp");
     }
-    
+
+    g_conf._mount_pid = getpid();
+    g_conf._mount_stamp = time(NULL);
+     
     logmsg(LOG_DEBUG, "Parameters:");
     logmsg(LOG_DEBUG, ".. username : [%s]", g_conf.username);
     logmsg(LOG_DEBUG, ".. password : [****]"); // intentionally hidden

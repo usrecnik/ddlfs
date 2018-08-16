@@ -34,6 +34,13 @@ int tfs_rmfile(const char *cache_fn);
  * */
 int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual_time);
 
+/**                                                                                                                     
+ * Check if cached file was modified/created at least once by this process. In readonly connection, we never want to
+ * check with the database if the object has changed.
+ * @return EXIT_SUCCESS: file is up2date, EXIT_FAILURE: file is outdated
+ * */
+int tfs_quick_validate(const char *path);
+
 /**
  * Create temporary directory for cached files (cached ddl content). 
  * This folder may be removed on umount (depending on parameters).
