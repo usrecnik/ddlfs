@@ -62,38 +62,40 @@ int tfs_setldt(const char *path, time_t last_ddl_time) {
     char *meta_fn = NULL;
     if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to determine meta file for cache file [%s]", path);
+        if (meta_fn != NULL)
+            free(meta_fn);
         return EXIT_FAILURE;
     }
 
     FILE *fp = fopen(meta_fn, "w");
     if (fp == NULL) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to open meta file [%s]: %d - %s", meta_fn, errno, strerror(errno));
+        free(meta_fn);
         return EXIT_FAILURE;
     }
 
-/*    int len = fwrite(&last_ddl_time, 1 , sizeof(time_t), fp);
-    if (len != sizeof(time_t)) {
-        logmsg(LOG_ERROR, "tfs_setldf - unable to write to meta file [%s]", meta_fn);
-        fclose(fp);
+    if (tfs_fwrite(&last_ddl_time, sizeof(time_t), fp) != EXIT_SUCCESS) {
+        free(meta_fn);
         return EXIT_FAILURE;
     }
-*/
-    if (tfs_fwrite(&last_ddl_time, sizeof(time_t), fp) != EXIT_SUCCESS)
-        return EXIT_FAILURE;
 
-    if (tfs_fwrite(&g_conf._mount_pid, sizeof(pid_t), fp) != EXIT_SUCCESS)
+    if (tfs_fwrite(&g_conf._mount_pid, sizeof(pid_t), fp) != EXIT_SUCCESS) {
+        free(meta_fn);
         return EXIT_FAILURE;
+    }
 
-    if (tfs_fwrite(&g_conf._mount_stamp, sizeof(time_t), fp) != EXIT_SUCCESS)
+    if (tfs_fwrite(&g_conf._mount_stamp, sizeof(time_t), fp) != EXIT_SUCCESS) {
+        free(meta_fn);
         return EXIT_FAILURE;
+    }
 
     if (fclose(fp) != 0) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to close meta file [%s]", meta_fn);
+        free(meta_fn);
         return EXIT_FAILURE;
     }
    
     free(meta_fn);
-   
     return EXIT_SUCCESS;
 }
 
@@ -102,12 +104,15 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
     char *meta_fn = NULL;
     if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_getldf - unable to determine meta file for cache file [%s]", path);
+        if (meta_fn != NULL)
+            free(meta_fn);
         return EXIT_FAILURE;
     }
 
     FILE *fp = fopen(meta_fn, "r");
     if (fp == NULL) {
         logmsg(LOG_ERROR, "tfs_getldf - unable to opem meta file [%s]: %d - %s", meta_fn, errno, strerror(errno));
+        free(meta_fn);
         return EXIT_FAILURE;
     }
 
@@ -120,6 +125,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
             logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
         }
         fclose(fp);
+        free(meta_fn);
         return EXIT_FAILURE;
     }
 
@@ -133,6 +139,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
                 logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
             }
             fclose(fp);
+            free(meta_fn);
             return EXIT_FAILURE;
         }
 
@@ -145,17 +152,18 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
                 logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
             }   
             fclose(fp);
+            free(meta_fn);
             return EXIT_FAILURE;
         }
     }
     
     if (fclose(fp) != 0) {
         logmsg(LOG_ERROR, "tfs_getldf - unable to close meta file [%s]", meta_fn);
+        free(meta_fn);
         return EXIT_FAILURE;
     }
 
-    free(meta_fn);    
-
+    free(meta_fn);
     return EXIT_SUCCESS;
 }
 
@@ -171,6 +179,8 @@ int tfs_rmfile(const char *cache_fn) {
     
     if (tfs_getldt_fn(cache_fn, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_rmfile - unable to determine metafile name for [%s]", cache_fn);
+        if (meta_fn != NULL)
+            free(meta_fn);
         return EXIT_FAILURE;
     }
     
@@ -193,11 +203,14 @@ int tfs_quick_validate(const char *path) {
     char *meta_fn = NULL;
     if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to determine meta file for cache file [%s]", path);
+        if (meta_fn != NULL)
+            free(meta_fn);
         return EXIT_FAILURE;
     }
     
     if (access(meta_fn, F_OK) == -1) {
         logmsg(LOG_DEBUG, "tfs_quick_validate - cache file [%s] does not yet exist.", meta_fn);
+        free(meta_fn);
         return EXIT_FAILURE;
     }
 
@@ -207,13 +220,17 @@ int tfs_quick_validate(const char *path) {
 
     if (tfs_getldt(meta_fn, &last_ddl_time, &mount_pid, &mount_stamp) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_quick_validate() - unable to obtain last mount pid & stamp from [%s]", meta_fn);
+        free(meta_fn);
         return EXIT_FAILURE;
     }
 
     if (mount_pid == g_conf._mount_pid && mount_stamp == g_conf._mount_stamp) {
         logmsg(LOG_DEBUG, "tfs_quick_validate() - validated [%s]", meta_fn);
+        free(meta_fn);
         return EXIT_SUCCESS;
     }
+
+    free(meta_fn);
     return EXIT_FAILURE;
 }
 

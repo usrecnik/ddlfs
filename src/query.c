@@ -69,7 +69,7 @@ int str_suffix(char **dst, const char *objectType) {
         strcpy(suffix, ".RES"); // might be anything really, like .properties, .xml, .ini, ...
     else
         strcpy(suffix, ".SQL");
-    
+    free(type); 
     // logmsg(LOG_DEBUG, "str_suffix() - returning suffix [%s] for type [%s]", suffix, type);
 
     *dst = suffix;
@@ -890,6 +890,12 @@ qry_schemas_cleanup:
     if (o_stm != NULL)
         ora_stmt_free(o_stm);
     
+    for (int i = 0; i < bind_in_i; i++)
+        free(bind_in[i]);
+   
+     for (int i = 0; i < bind_like_i; i++)
+        free(bind_like[i]);
+     
     return retval;
 }
 
@@ -958,8 +964,10 @@ static int qry_objects_filesize(t_fsentry *schema, t_fsentry *type) {
         stat(fname, &st);
 
         object->fsize = st.st_size;
+
+        free(fname);
     }
-    
+
     return EXIT_SUCCESS;
 }
 
@@ -1116,6 +1124,9 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
 
 qry_objects_cleanup:
 
+    if (schema_name != NULL)
+        free(schema_name);
+    
     if (type_name != NULL)
         free(type_name);    
 

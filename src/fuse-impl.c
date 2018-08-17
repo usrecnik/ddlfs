@@ -110,17 +110,14 @@ static int qry_dbro_cache(char **path, t_fsentry *type) {
         }
 
         char ftype = ((file_stat.st_mode & S_IXUSR) ? 'F' : 'I');
-        logmsg(LOG_DEBUG, "DEBUG1: ftype=[%c] [%d]", ftype, ftype);
         // load vfs from cache
         t_fsentry *entry = vfs_entry_create(
             ftype, // F=valid (execution bit set), I=invalid
             path[DEPTH_OBJECT],
             last_ddl_time, 
             last_ddl_time);
-        logmsg(LOG_DEBUG, "DEBUG2: ftype=[%c] [%d]", entry->ftype, entry->ftype);
         vfs_entry_add(type, entry);
         vfs_entry_sort(type);
-        logmsg(LOG_DEBUG, "DEBUG3: ftype=[%c] [%d]", entry->ftype, entry->ftype);
         retval = EXIT_SUCCESS;
     }
     
@@ -232,6 +229,7 @@ int fs_getattr( const char *path, struct stat *st )
         st->st_nlink = 1;
         st->st_mode = S_IFREG | 0444;
         st->st_size = (g_ddl_log_buf == NULL ? 0 : g_ddl_log_len);
+        fs_path_free(part);
         return 0;
     }
 
@@ -239,6 +237,7 @@ int fs_getattr( const char *path, struct stat *st )
 
     if (entry == NULL) {
         logmsg(LOG_INFO, "fuse-getattr: File not found [%s]\n\n", path);
+        fs_path_free(part);
         return -ENOENT;
     }
 
@@ -249,7 +248,8 @@ int fs_getattr( const char *path, struct stat *st )
         char *fname;
         qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
         stat(fname, &tmp_st);
-    }    
+        free(fname);
+    }
 
     st->st_uid = getuid();
     st->st_gid = getgid();
@@ -275,6 +275,7 @@ int fs_getattr( const char *path, struct stat *st )
         st->st_size = tmp_st.st_size;
     }
     
+    fs_path_free(part);
     return 0;
 }
 
@@ -314,11 +315,16 @@ static int fake_open(const char *path,
     int depth = fs_path_create(&part, path);
     if (depth != DEPTH_MAX) {
         logmsg(LOG_ERROR, "Unable to open file at depth=%d (%s).", depth, path);
+        fs_path_free(part);
         return -1;
     }
-    char *fname;
-    if (qry_object(part[0], part[1], part[2], &fname) != EXIT_SUCCESS)
+    char *fname = NULL;
+    if (qry_object(part[0], part[1], part[2], &fname) != EXIT_SUCCESS) {
+        if (fname != NULL)
+            free(fname);
+        fs_path_free(part);
         return -1;
+    }
     
     int fh;
     if (fi != NULL)
@@ -329,9 +335,15 @@ static int fake_open(const char *path,
     if (fh < 0) {
         logmsg(LOG_ERROR, "Unable to open [%s] for passthrough (%d)", 
             fname, errno);
+        if (fname != NULL)
+            free(fname);
+        fs_path_free(part);
         return -1;
     }
     
+    if (fname != NULL)
+        free(fname);
+    fs_path_free(part);
     return fh;
 }
 
@@ -449,6 +461,8 @@ int fs_release(const char *path,
     if (close(fi->fh) != 0) {
         // closing also flushes metadata, such as mtime
         logmsg(LOG_DEBUG, "Unable to close underlying file (%s), error=%d", fname, errno);
+        fs_path_free(part);
+        free(fname);
         return -errno;
     }
 
@@ -489,7 +503,7 @@ int fs_release(const char *path,
                 logmsg(LOG_ERROR, "fs_release() - unable to re-open temp file as r/o.");
                 retval = -1;
                 goto fs_release_final;
-            }            
+            }
             buf[0] = '\0';
 
             size_t newLenJava = 0;
@@ -544,6 +558,9 @@ fs_release_final:
     if (object_name != NULL)
         free(object_name);
 
+    fs_path_free(part);
+    free(fname);
+    
     return retval;
 }
 
@@ -569,21 +586,25 @@ int fs_create (const char *path,
 
         if (str_fn2obj(&object_type, part[DEPTH_TYPE], NULL) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+            fs_path_free(part);
             return -ENOMEM;
         }
 
         if (str_fn2obj(&object_name, part[DEPTH_OBJECT], part[DEPTH_TYPE]) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+            fs_path_free(part);
             return -ENOMEM;
         }
         
         if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
+            fs_path_free(part);
             return -ENOMEM;
         }
          
         if (depth != 3) {
             logmsg(LOG_ERROR, "Creating of new objects is only allowed on depth level 3");
+            fs_path_free(part);
             return -EINVAL;
         }
 
@@ -613,6 +634,8 @@ int fs_create (const char *path,
                 object_schema, object_name, object_name);
         else {
             logmsg(LOG_ERROR, "Cannot create empty object of type [%s]- this is not supported.", part[DEPTH_TYPE]);
+
+            fs_path_free(part);
             // @todo - support other object types
             return -EINVAL; // invalid argument 
         }
@@ -645,15 +668,20 @@ int fs_truncate(const char *path,
     
     if (depth != DEPTH_MAX) {
         logmsg(LOG_ERROR, "fs_truncate() - you can only truncate files in depth 3 (sql files)");
+        fs_path_free(part);
         return -1;
     }
 
     qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
     if (truncate(fname, 0) == -1) {
         logmsg(LOG_ERROR, "fs_truncate() - unable to truncate [%s], errno=[%d]", fname, errno);
+        fs_path_free(part);
+        free(fname);
         return -errno;
     }
  
+    fs_path_free(part);
+    free(fname);
     return 0;
 }
 
@@ -670,18 +698,22 @@ int fs_unlink(const char *path) {
  
     if (depth != 3) {
         logmsg(LOG_ERROR, "Cannot unlink objects which are not at level 3");
+        fs_path_free(part);
         return -EINVAL;
     }
     if (str_fn2obj(&object_type, part[DEPTH_TYPE], NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+        fs_path_free(part);
         return -ENOMEM;
     }
     if (str_fn2obj(&object_name, part[DEPTH_OBJECT], part[DEPTH_TYPE]) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+        fs_path_free(part);
         return -ENOMEM;
     }
     if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
+        fs_path_free(part);
         return -ENOMEM;
     }
         
@@ -712,6 +744,7 @@ int fs_unlink(const char *path) {
     else {
         logmsg(LOG_ERROR, "Cannot drop object %s.%s, operation not (yet?) supported.", 
             part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
+        fs_path_free(part);
         return -EINVAL;
     }
     fs_path_free(part);

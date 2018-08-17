@@ -77,7 +77,7 @@ ora_get_open_mode_cleanup:
 
 int ora_connect(char* username, char* password, char* database) {
     sword r;
-
+    
     // https://docs.oracle.com/cd/E11882_01/appdev.112/e10646/oci16rel001.htm#LNOCI17121
     ub4 auth_type = OCI_CRED_RDBMS;
     ub4 user_role = OCI_DEFAULT;

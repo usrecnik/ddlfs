@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <signal.h>
 
 #include "logging.h"
 #include "config.h"
@@ -20,6 +21,15 @@
 #include "tempfs.h"
 
 #define DDLFS_VERSION "2.0"
+
+void sigusr1_handler(int signo) {
+    logmsg(LOG_INFO, " ");
+    logmsg(LOG_INFO, "Received signal %d", signo);
+    if (signo == SIGUSR1) {
+        vfs_dump(g_vfs, 0);   
+    }
+    logmsg(LOG_INFO, "Singal handled");
+}
 
 int main(int argc, char *argv[]) {
     memset(&g_conf, 0, sizeof(g_conf));
@@ -35,14 +45,16 @@ int main(int argc, char *argv[]) {
 
     logmsg(LOG_DEBUG, " ");
     logmsg(LOG_DEBUG, "-> mount <-");
+
+    if (signal(SIGUSR1, sigusr1_handler) == SIG_ERR) 
+        logmsg(LOG_ERROR, "Unable to register SIGUSR1 signal handler");
         
-logmsg(LOG_DEBUG, "DBG0");
     struct fuse_args args = parse_arguments(argc, argv);
     if (args.argc == -1) {
         logmsg(LOG_ERROR, "Missing or invalid parameters [%d], exiting.", args.argc);
         return 1;
     }
-logmsg(LOG_DEBUG, "DBG1");    
+    
     // force single-threaded mode
     fuse_opt_add_arg(&args, "-s");
 
