@@ -58,7 +58,7 @@ static int fs_path_create (char ***part, const char *path) {
     return i;
 }
 
-static void qry_any(int depth, t_fsentry* schema, t_fsentry *type) {
+static void qry_any(int depth, t_fsentry *schema, t_fsentry *type) {
     switch (depth) {
         case DEPTH_SCHEMA:
             qry_schemas();
@@ -78,8 +78,60 @@ static void qry_any(int depth, t_fsentry* schema, t_fsentry *type) {
     }
 }
 
+// e.g. raw_path=/SYS/VIEW/DBA_TABLES.SQL
+// e.g. path[0]=SYS, path[1]=VIEW, path[2]=DBA_TABLES.SQL
+static int qry_dbro_cache(char **path, t_fsentry *type) {
+    char *cache_fname = NULL;// ddlfs-XDB.VIEW.DOCUMENT_LINKS2.SQL.tmp
+    if (qry_object_fname(path[0], path[1], path[2], &cache_fname) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "qry_dbro_cache() - unable to determine filename, qry_object_fname() failed");
+        if (cache_fname != NULL)
+            free(cache_fname);
+        return EXIT_FAILURE;
+    }
+    
+    int retval = EXIT_FAILURE;
+    if (tfs_quick_validate(cache_fname) == EXIT_SUCCESS) {
+        
+        // get last_ddl_time from cache
+        time_t last_ddl_time;
+        if (tfs_getldt(cache_fname, &last_ddl_time, NULL, NULL) != EXIT_SUCCESS) {
+            if (cache_fname != NULL)
+                free(cache_fname);
+            return EXIT_FAILURE;
+        }
+
+        // get execution bit from cache
+        struct stat file_stat;
+        if(stat(cache_fname, &file_stat) < 0) {
+            logmsg(LOG_ERROR, "qry_dbro_cache() - unable to determine execution bit, stat() failed");
+            if (cache_fname != NULL)
+                free(cache_fname);
+            return EXIT_FAILURE;
+        }
+
+        char ftype = ((file_stat.st_mode & S_IXUSR) ? 'F' : 'I');
+        logmsg(LOG_DEBUG, "DEBUG1: ftype=[%c] [%d]", ftype, ftype);
+        // load vfs from cache
+        t_fsentry *entry = vfs_entry_create(
+            ftype, // F=valid (execution bit set), I=invalid
+            path[DEPTH_OBJECT],
+            last_ddl_time, 
+            last_ddl_time);
+        logmsg(LOG_DEBUG, "DEBUG2: ftype=[%c] [%d]", entry->ftype, entry->ftype);
+        vfs_entry_add(type, entry);
+        vfs_entry_sort(type);
+        logmsg(LOG_DEBUG, "DEBUG3: ftype=[%c] [%d]", entry->ftype, entry->ftype);
+        retval = EXIT_SUCCESS;
+    }
+    
+    if (cache_fname != NULL)
+        free(cache_fname);
+  
+    return retval;
+}
+
 // return NULL if file not found
-static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
+static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFound) {
     if (path[0] == NULL) {
         qry_any(0, NULL, NULL);
         return g_vfs;
@@ -108,26 +160,59 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
         }
     }
     //---
+
+    // DEBUG 
+    /*
+    logmsg(LOG_DEBUG, "-- path dump (loadFound=%d) --", loadFound);
+    for (int i = 0; i < DEPTH_MAX; i++) {
+        if (path[i] == NULL)
+            logmsg(LOG_DEBUG, "path[%d]=NULL", i);
+        else
+            logmsg(LOG_DEBUG, "path[%d]=[%s]", i, path[i]);
+    }
+    logmsg(LOG_DEBUG, "-- end of path dump --");
+    */
+    // -- end of DEBUG --
     
     t_fsentry *entries[DEPTH_MAX] = {NULL, NULL, NULL};
     for (int i = 0; i < DEPTH_MAX; i++) {
         if (path[i] == NULL) {
-            if (loadFound) {
+            if (loadFound)
                 qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
-            }
-
             return entries[i-1];
         }
+        
         entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
         if (entries[i] == NULL) {
-            qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
-            entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
+            int used_dbro = 0;
+            if (g_conf.dbro == 1 && i == DEPTH_OBJECT && path[DEPTH_OBJECT] != NULL) {
+                used_dbro = 1;
+                if (qry_dbro_cache(path, entries[DEPTH_TYPE]) != EXIT_SUCCESS) {
+                    qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
+                }
+             } else 
+                qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
+            
+            entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);            
+            if (used_dbro == 1 && entries[i] == NULL) {
+                logmsg(LOG_ERROR, "qry_dbro_cache failed to properly update g_vfs...");
+                vfs_dump(g_vfs, 0);
+            }
         } 
         if (entries[i] == NULL) {
             // logmsg(LOG_ERROR, "File not found, depth=[%d], path_part=[%s].", i, path[i]);
             return NULL;
         }
     }
+
+    // free cached vfs contents of the other (previous) schema...
+    if (entries[DEPTH_SCHEMA] != NULL) {
+        if ( (g_vfs_last_schema != NULL) && (strcmp(g_vfs_last_schema->fname, entries[DEPTH_SCHEMA]->fname) != 0)) {
+            logmsg(LOG_DEBUG, "Clearing VFS for [%s] in favour of [%s]", g_vfs_last_schema->fname, entries[DEPTH_SCHEMA]->fname);
+            vfs_entry_free(g_vfs_last_schema, 1);
+        }
+    }
+    g_vfs_last_schema = entries[DEPTH_SCHEMA];
     
     return entries[DEPTH_MAX-1];
 }
@@ -136,7 +221,7 @@ int fs_getattr( const char *path, struct stat *st )
 {
     char **part;
     int depth = fs_path_create(&part, path);
-    t_fsentry *entry = fs_vfs_by_path(part, 0);
+    t_fsentry *entry = fs_vfs_by_path(path, part, 0);
 
     if (strcmp(path, "/ddlfs.log") == 0) {
         st->st_uid = getuid();
@@ -168,6 +253,7 @@ int fs_getattr( const char *path, struct stat *st )
 
     st->st_uid = getuid();
     st->st_gid = getgid();
+    st->st_blocks = 1;
     st->st_atime = entry->modified;
     st->st_mtime = entry->modified; // /* Time of last modification */
     st->st_ctime = entry->modified; // /* Time of last status change */
@@ -176,9 +262,9 @@ int fs_getattr( const char *path, struct stat *st )
         st->st_nlink = 2;
         st->st_mode = S_IFDIR | 0644;
     } else {
-        if (depth == DEPTH_MAX && strcasecmp(part[DEPTH_TYPE], "TABLE") == 0)
+        if (depth == DEPTH_MAX && strcasecmp(part[DEPTH_TYPE], "TABLE") == 0) {
             st->st_mode = S_IFREG | 0444;
-        else {
+        } else {
             if (entry->ftype == 'F')
                 st->st_mode = S_IFREG | 0744;
             else 
@@ -202,7 +288,7 @@ int fs_readdir(const char *path,
 
     char **part;
     fs_path_create(&part, path);
-    t_fsentry *entry = fs_vfs_by_path(part, 1);
+    t_fsentry *entry = fs_vfs_by_path(path, part, 1);
     
     if (entry == NULL) {
         logmsg(LOG_DEBUG, "File not found for path [%s]", path);

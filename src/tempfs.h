@@ -19,7 +19,7 @@ int tfs_setldt(const char *path, time_t last_ddl_time);
 /**
  * get "last_ddl_time" extended attribute from file specified by *path.
  * */
-int tfs_getldt(const char *path, time_t *last_ddl_time);
+int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t *mount_stamp);
 
 /**
  * Remove cached file (and its metadata).

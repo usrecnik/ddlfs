@@ -77,6 +77,7 @@ int str_suffix(char **dst, const char *objectType) {
     return EXIT_SUCCESS;
 }
 
+// @todo: this function should probably go to tempfs.c
 int qry_object_fname(const char *schema,
                      const char *type,
                      const char *object,
@@ -401,6 +402,7 @@ static int qry_object_all_source(const char *schema,
 // 11g ALL_VIEWS
 "select w.text as s,\
  to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ o.status,\
  null as e\
  from all_views w\
  join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
@@ -410,6 +412,7 @@ static int qry_object_all_source(const char *schema,
 // 11g ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s,\
  to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ o.status,\
  null as e\
  from all_source s\
  join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\"\
@@ -423,6 +426,7 @@ static int qry_object_all_source(const char *schema,
 // 12c ALL_VIEWS
 "select w.text as s,\
  to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ o.status,\
  o.\"EDITIONABLE\" as e\
  from all_views w\
  join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
@@ -432,6 +436,7 @@ static int qry_object_all_source(const char *schema,
 // 12c ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s,\
  to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
+ o.status,\
  \"EDITIONABLE\" as e\
  from all_source s\
  join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\"\
@@ -444,7 +449,8 @@ static int qry_object_all_source(const char *schema,
     ORA_STMT_PREPARE (qry_object_all_source);
     ORA_STMT_DEFINE_STR_I(qry_object_all_source, 1, text,        4*1024*1024);
     ORA_STMT_DEFINE_STR_I(qry_object_all_source, 2, ddl_time,    30);
-    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 3, editionable, 2);
+    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 3, valid,       10);
+    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 4, editionable, 2);
     ORA_STMT_BIND_STR(qry_object_all_source, 1, type);
     ORA_STMT_BIND_STR(qry_object_all_source, 2, object);
     ORA_STMT_BIND_STR(qry_object_all_source, 3, schema);
@@ -459,6 +465,7 @@ static int qry_object_all_source(const char *schema,
     char *org = NULL;
     char editionable[30] = "";
     int row_count = 0;
+    int validity = -1; // -1=unknown, 0=>valid, 1=>invalid;
     
     for(; *tmp != '\0'; tmp++)
         if (*tmp == ' ')
@@ -471,6 +478,11 @@ static int qry_object_all_source(const char *schema,
             
             if (tfs_validate(fname, ORA_NVL(ddl_time, "1990-01-01 01:01:01"), last_ddl_time) == EXIT_SUCCESS)
                 break;
+
+            if (strcmp(ORA_NVL(valid, "INVALID"), "VALID") == 0)
+                validity = 0;
+            else
+                validity = 1;
              
             if (strcmp(ORA_NVL(editionable, "X"), "Y") == 0)
                  strcpy(editionable, " EDITIONABLE");
@@ -639,8 +651,9 @@ static int qry_object_all_source(const char *schema,
         char empty_msg[] = "-- source for this object not found in all_source view.\n";
         fwrite(empty_msg, 1, strlen(empty_msg), fp);
     }
+    
+    chmod(fname, validity == 0 ? 0744 : 0644);
 
-     
 qry_object_all_source_cleanup:
     ORA_STMT_FREE;
 
@@ -965,11 +978,6 @@ from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type and ge
     char *type_name = strdup(type->fname);
     char *suffix = NULL;
 
-    // free cached vfs contents of the other (previous) schema...
-    if ( (g_vfs_last_schema != NULL) && (g_vfs_last_schema != schema))
-        vfs_entry_free(g_vfs_last_schema, 1);
-    g_vfs_last_schema = schema;
-
     if (type_name == NULL || schema_name == NULL) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to strdup type_name and/or schema_name");
         if (type_name != NULL)
@@ -1066,7 +1074,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         }
         
         time_t t_modified = timegm(temptime);
-        size_t fname_len= ((strlen((char*)o_sel[0])+strlen(suffix))+1)*sizeof(char);
+        size_t fname_len = ((strlen((char*)o_sel[0])+strlen(suffix))+1)*sizeof(char);
         char *fname = malloc(fname_len);
         if (fname == NULL) {
             logmsg(LOG_ERROR, "qry_objects() - Unable to malloc for fname, fname_len=[%d]", fname_len);
