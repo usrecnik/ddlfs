@@ -29,10 +29,13 @@ t_fsentry* vfs_entry_create(const char type,
         t->children = NULL;
     }
     t->allocated = 1;
+    // logmsg(LOG_DEBUG, "++ VFS_ENTRY (%s) addr=[%p]", fname, t);
     return t;
 }
 
 void vfs_entry_free(t_fsentry *entry, int children_only) {
+    //logmsg(LOG_DEBUG, "-- VFS_ENTRY (%s, children_only=%d) addr=[%p]", entry->fname, children_only, entry);
+
     for (int i = 0; i < entry->count; i++)
         vfs_entry_free(entry->children[i], 0);
         
@@ -40,17 +43,17 @@ void vfs_entry_free(t_fsentry *entry, int children_only) {
     if (!children_only) {
         if (entry->children != NULL)
             free(entry->children);
+        entry->allocated = 0;
         free(entry->fname);
         free(entry);
-        entry->allocated = 0;
     }
 }
 
 void vfs_dump(t_fsentry *entry, int depth) {
     for (int i = 0; i < depth*2; i++)
         printf("..");
-    printf("%s (typ=%c, cnt=%d, cap=%d, alc=%d)\n", 
-        entry->fname, entry->ftype, entry->count, entry->capacity, entry->allocated);
+    printf("%s (typ=%c, cnt=%d, cap=%d, alc=%d, addr=%p)\n", 
+        entry->fname, entry->ftype, entry->count, entry->capacity, entry->allocated, (void*) entry);
 
     if (entry->children != NULL)
         for (int i = 0; i < entry->count; i++)

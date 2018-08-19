@@ -207,6 +207,7 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
         if ( (g_vfs_last_schema != NULL) && (strcmp(g_vfs_last_schema->fname, entries[DEPTH_SCHEMA]->fname) != 0)) {
             logmsg(LOG_DEBUG, "Clearing VFS for [%s] in favour of [%s]", g_vfs_last_schema->fname, entries[DEPTH_SCHEMA]->fname);
             vfs_entry_free(g_vfs_last_schema, 1);
+            logmsg(LOG_DEBUG, "DEBUG: Clearing finished");
         }
     }
     g_vfs_last_schema = entries[DEPTH_SCHEMA];

@@ -864,12 +864,16 @@ int qry_schemas() {
         t_fsentry *exists = vfs_entry_search(g_vfs, entry->fname);
         if (exists == NULL)
             vfs_entry_add(g_vfs, entry);
+        else
+            vfs_entry_free(entry, 0);
     }
 
     t_fsentry *ddllog = vfs_entry_create('F', "ddlfs.log", time(NULL), time(NULL));
     t_fsentry *exists = vfs_entry_search(g_vfs, ddllog->fname);
     if (exists == NULL)
         vfs_entry_add(g_vfs, ddllog);
+    else 
+        vfs_entry_free(ddllog, 0);
     
     vfs_entry_sort(g_vfs);
 
