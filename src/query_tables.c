@@ -55,35 +55,27 @@ static void deflist_free(struct deflist *curr) {
 
 static int tab_all_tables(const char *schema, const char *table, struct tabledef *def) {
     const char *query = 
-"select t.\"TEMPORARY\", o.last_ddl_time\
- from all_objects o\
- left join all_tables t on o.owner=t.owner and o.object_name = t.table_name\
- where o.owner=:bind_owner\
- and o.object_name=:bind_name\
- and o.object_type='TABLE'";
-    
+"select t.\"TEMPORARY\"\
+ from all_tables t where t.owner=:bind_owner and t.table_name=:bind_name";
+     
     int retval = EXIT_SUCCESS;
 
     ORA_STMT_PREPARE(tab_all_tables);
     ORA_STMT_DEFINE_STR_I(tab_all_tables, 1, temporary, 2);
-    ORA_STMT_DEFINE_STR  (tab_all_tables, 2, ddl_time, 30);
     ORA_STMT_BIND_STR(tab_all_tables, 1, schema);
     ORA_STMT_BIND_STR(tab_all_tables, 2, table);
     ORA_STMT_EXECUTE(tab_all_tables, 0);
     if (ORA_STMT_FETCH) {
         if (strcmp(ORA_NVL(temporary, "X"), "X") == 0) {
-            def->exists = 'N';                                                                                              
-            def->temporary = 'N';                                                                                           
-            def->last_ddl_time = strdup("1990-01-01 01:01:02");
+            def->exists = 'N';
+            def->temporary = 'N';
         } else {
             def->exists = 'Y';    
             def->temporary = (strcmp(ORA_NVL(temporary, "N"), "Y") == 0) ? 'Y' : 'N';
-            def->last_ddl_time = strdup(ORA_VAL(ddl_time));
         }
     } else {
         def->exists = 'N';
         def->temporary = 'N';
-        def->last_ddl_time = strdup("1990-01-01 01:01:02");
     }
 
 tab_all_tables_cleanup:
@@ -423,8 +415,7 @@ tab_all_indexes_cleanup:
 
 int qry_object_all_tables(const char *schema,
                           const char *table,
-                          const char *fname,
-                          time_t *last_ddl_time) {
+                          const char *fname) {
     
     int retval = EXIT_SUCCESS;
     FILE *fp = NULL;
@@ -433,7 +424,6 @@ int qry_object_all_tables(const char *schema,
     struct deflist *col = NULL;
     int colcnt = 0;
 
-    def->last_ddl_time = NULL;
     def->columns = NULL;
     def->constraints = NULL;
     def->indexes = NULL;
@@ -449,9 +439,6 @@ int qry_object_all_tables(const char *schema,
         goto qry_object_all_tables_cleanup;
     }
 
-    if (tfs_validate(fname, def->last_ddl_time, last_ddl_time) == EXIT_SUCCESS)
-        goto qry_object_all_tables_cleanup;
-    
     if (tab_all_tab_columns(schema, table, def) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): tab_all_tab_columns() failed.");
         retval = EXIT_FAILURE;
@@ -517,9 +504,6 @@ qry_object_all_tables_cleanup:
         logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to close [%s]: %d %n", fname, errno, strerror(errno));
 
     if (def != NULL) {
-
-        if (def->last_ddl_time != NULL)
-            free(def->last_ddl_time);
 
         if (def->columns != NULL)
             deflist_free(def->columns);

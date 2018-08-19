@@ -19,8 +19,12 @@ sword ora_check(sword status) {
             break;
   
         case OCI_SUCCESS_WITH_INFO:
-            logmsg(LOG_ERROR, "OCI_SUCCESS_WITH_INFO");
-            break;
+            OCIErrorGet(
+                g_connection.err, (ub4) 1, (text *) NULL, &errcode, errbuf, 
+                (ub4) sizeof(errbuf), (ub4) OCI_HTYPE_ERROR);
+            if (errcode != 24347) //ORA-24347: Warning of a NULL column in an aggregate function (any query on user_role_privs will produce this warning on 11.2.0.3
+                logmsg(LOG_ERROR, "OCI_SUCCESS_WITH_INFO: ORA-%d: %s", errcode, (char *)errbuf);
+            return OCI_SUCCESS;
   
         case OCI_NEED_DATA:
             logmsg(LOG_ERROR, "OCI_NEED_DATA");
@@ -85,8 +89,11 @@ int ora_connect(char* username, char* password, char* database) {
     if (strncmp(username, "/", 1) == 0)
         auth_type = OCI_CRED_EXT;
 
-    if (g_conf.userrole != NULL && strcmp(g_conf.userrole, "SYSDBA") == 0)
+    g_conf._isdba = 0;
+    if (g_conf.userrole != NULL && strcmp(g_conf.userrole, "SYSDBA") == 0) {
         user_role = OCI_SYSDBA;
+        g_conf._isdba = 1;
+    }
 
     if (g_conf.userrole != NULL && strcmp(g_conf.userrole, "SYSOPER") == 0)
         user_role = OCI_SYSOPER;
@@ -187,7 +194,6 @@ int ora_connect(char* username, char* password, char* database) {
 
     return EXIT_SUCCESS;
 }
-
 
 int ora_disconnect() {
     logmsg(LOG_INFO, "Disconnecting from Oracle Database.");

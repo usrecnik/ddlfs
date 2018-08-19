@@ -72,14 +72,21 @@ int main(int argc, char *argv[]) {
     
     if (ora_connect(g_conf.username, g_conf.password, g_conf.database) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "Unable to connect to database.");
-        return EXIT_SUCCESS;
+        return EXIT_FAILURE;
     }
 
+    logmsg(LOG_DEBUG, "is_sysdba=[%d]", g_conf._isdba);
+
     if (g_conf.dbro == -1) {
-        logmsg(LOG_DEBUG, "neither dbro nor dbrw parameter given, thus trying 'select open_mode from v$database'");
-        g_conf.dbro = ora_get_open_mode();
-        if (g_conf.dbro == -1) {
-            logmsg(LOG_DEBUG, ".. unable to query v$database, assuming the database is opened as read/write");
+        if (g_conf._isdba == 1) { 
+            logmsg(LOG_DEBUG, "neither dbro nor dbrw parameter given, thus trying 'select open_mode from v$database'");
+            g_conf.dbro = ora_get_open_mode();
+            if (g_conf.dbro == -1) {
+                logmsg(LOG_DEBUG, ".. unable to query v$database, assuming the database is opened as read/write");
+                g_conf.dbro = 0;
+            }
+        } else {
+            logmsg(LOG_DEBUG, "assuming database opened as read/write because this user has no (sys)dba privileges (needed to obtain this info).");
             g_conf.dbro = 0;
         }
     }

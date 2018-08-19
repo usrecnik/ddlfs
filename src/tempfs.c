@@ -13,11 +13,8 @@
 
 #include "config.h"
 #include "logging.h"
-/*
-@todo - mkRelease.sh should add following to requirements: 
-$ sudo apt-get install libssl-dev
-$ sudo yum install openssl-devel
-*/
+#include "util.h"
+
 
 /**
  * determine meta file name (meta_fn) for specified cache file name (cache_fn).
@@ -234,26 +231,9 @@ int tfs_quick_validate(const char *path) {
     return EXIT_FAILURE;
 }
 
-int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual_time) {
-    
-    struct tm *temptime = malloc(sizeof(struct tm));
-    if (temptime == NULL) {
-        logmsg(LOG_ERROR, "tfs_validate - unable to allocate memory for temptime");
-        return EXIT_FAILURE;
-    }
-    
-    // convert last_ddl_time to binary format time_t
-    memset(temptime, 0, sizeof(struct tm));
-    char* xx = strptime((char*) last_ddl_time, "%Y-%m-%d %H:%M:%S", temptime);
-    if (xx == NULL || *xx != '\0') {
-        logmsg(LOG_ERROR, "tfs_validate - Unable to parse date (%s)", last_ddl_time);
-        free(temptime);
-        return EXIT_FAILURE;
-    }
-    *actual_time = timegm(temptime); // last_ddl_time as we got it by querying the datbase (@param last_ddl_time)
-    time_t cached_time = 0;           // last_ddl_time as specified in metadata about cached file (@param cache_fn)
-    free(temptime);
-    
+int tfs_validate2(const char *cache_fn, time_t last_ddl_time) {
+    time_t cached_time = 0;
+
     // check if tempfile already exist and has atime equal to last_modified_time.
     // there is no need to recreate tempfile if times (atime & last_modified_time) match.
     if (access(cache_fn, F_OK) == -1 ) {
@@ -266,13 +246,18 @@ int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual
         return EXIT_FAILURE;
     }
 
-    if (cached_time == *actual_time) {
+    if (cached_time == last_ddl_time) {
         logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is already up2date.", cache_fn);
         return EXIT_SUCCESS;
     }
     
     logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is outdated.", cache_fn);
     return EXIT_FAILURE;
+}
+
+int tfs_validate(const char *cache_fn, char *last_ddl_time, time_t *actual_time) {
+    *actual_time = utl_str2time(last_ddl_time);
+    return tfs_validate2(cache_fn, *actual_time);
 }
 
 // return 1 if haystack ends with suffix and 0 otherwise.

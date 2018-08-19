@@ -15,6 +15,7 @@
 #include "oracle.h"
 #include "vfs.h"
 #include "tempfs.h"
+#include "util.h"
 #include "query_tables.h"
 
 #define LOB_BUFFER_SIZE 8196
@@ -389,8 +390,7 @@ static int qry_object_all_source(const char *schema,
                                  const char *object,
                                  const char *fname,
                                  const  int is_java_source,
-                                 const  int is_trigger_source,
-                                     time_t *last_ddl_time) {
+                                 const  int is_trigger_source) {
 
     int is_view_source = ((strcmp(type, "VIEW") == 0) ? 1 : 0);
     int retval = EXIT_SUCCESS;
@@ -401,7 +401,6 @@ static int qry_object_all_source(const char *schema,
             strcpy(query,
 // 11g ALL_VIEWS
 "select w.text as s,\
- to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
  o.status,\
  null as e\
  from all_views w\
@@ -411,7 +410,6 @@ static int qry_object_all_source(const char *schema,
             strcpy(query, 
 // 11g ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s,\
- to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
  o.status,\
  null as e\
  from all_source s\
@@ -425,7 +423,6 @@ static int qry_object_all_source(const char *schema,
             strcpy(query, 
 // 12c ALL_VIEWS
 "select w.text as s,\
- to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
  o.status,\
  o.\"EDITIONABLE\" as e\
  from all_views w\
@@ -435,7 +432,6 @@ static int qry_object_all_source(const char *schema,
             strcpy(query, 
 // 12c ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s,\
- to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as t,\
  o.status,\
  \"EDITIONABLE\" as e\
  from all_source s\
@@ -448,9 +444,8 @@ static int qry_object_all_source(const char *schema,
     
     ORA_STMT_PREPARE (qry_object_all_source);
     ORA_STMT_DEFINE_STR_I(qry_object_all_source, 1, text,        4*1024*1024);
-    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 2, ddl_time,    30);
-    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 3, valid,       10);
-    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 4, editionable, 2);
+    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 2, valid,       10);
+    ORA_STMT_DEFINE_STR_I(qry_object_all_source, 3, editionable, 2);
     ORA_STMT_BIND_STR(qry_object_all_source, 1, type);
     ORA_STMT_BIND_STR(qry_object_all_source, 2, object);
     ORA_STMT_BIND_STR(qry_object_all_source, 3, schema);
@@ -476,9 +471,6 @@ static int qry_object_all_source(const char *schema,
         
         if (first) {
             
-            if (tfs_validate(fname, ORA_NVL(ddl_time, "1990-01-01 01:01:01"), last_ddl_time) == EXIT_SUCCESS)
-                break;
-
             if (strcmp(ORA_NVL(valid, "INVALID"), "VALID") == 0)
                 validity = 0;
             else
@@ -664,6 +656,78 @@ qry_object_all_source_cleanup:
 }
 
 
+static int qry_last_ddl_time(const char *schema,
+                             const char *type,
+                             const char *object,
+                             time_t *last_ddl_time /* out */) {
+
+    const char *query_user = 
+"select to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
+ from all_objects where owner=:schema and object_type=:type and object_name=:name";
+
+    const char *query_dba = // @todo - do the decode part on client 
+"select o.mtime\
+ from sys.obj$ o\
+ join sys.user$ u on u.user# = o.owner#\
+ where u.name=:schema and o.type#=:type and o.name=:name";
+    
+    const char *query = (g_conf._isdba == 1 ? query_dba : query_user);
+    
+    int retval = EXIT_SUCCESS;
+    int type_id = 0;
+    
+    if (strcmp(type, "TABLE") == 0)
+        type_id = 2;
+    else if (strcmp(type, "VIEW") == 0)
+        type_id = 4;
+    else if (strcmp(type, "PROCEDURE") == 0)
+        type_id = 7;
+    else if (strcmp(type, "FUNCTION") == 0)
+        type_id = 8;
+    else if (strcmp(type, "PACKAGE") == 0)
+        type_id = 9;
+    else if (strcmp(type, "PACKAGE BODY") == 0)
+        type_id = 11;
+    else if (strcmp(type, "TRIGGER") == 0)
+        type_id = 12;
+    else if (strcmp(type, "TYPE") == 0)
+        type_id = 13;
+    else if (strcmp(type, "TYPE BODY") == 0)
+        type_id = 14;
+    else if (strcmp(type, "JAVA SOURCE") == 0)
+        type_id = 28;
+    else if (strcmp(type, "MATERIALIZED VIEW") == 0)
+        type_id = 42; // @todo - mv are not yet supported.
+    
+    OCIBind *o_bn2; 
+    ORA_STMT_PREPARE(qry_last_ddl_time);
+    ORA_STMT_DEFINE_STR(qry_last_ddl_time, 1, last_str_time, 30);
+    ORA_STMT_BIND_STR(qry_last_ddl_time, 1, schema);
+    int r = 0;
+    if (g_conf._isdba == 1)
+        ora_stmt_bind(o_stm, &o_bn2, 2, (void*) &type_id, sizeof(int), SQLT_INT);
+    else
+        ora_stmt_bind(o_stm, &o_bn2, 2, (void*) type, strlen(type)+1, SQLT_STR);
+    if (r) {
+        logmsg(LOG_ERROR, "qry_last_ddl_time(): Unable to bind type");
+        retval = EXIT_FAILURE;
+        goto qry_last_ddl_time_cleanup;
+    }
+    ORA_STMT_BIND_STR(qry_last_ddl_time, 3, object);
+    ORA_STMT_EXECUTE(qry_last_ddl_time, 0);
+    if (ORA_STMT_FETCH) {
+        *last_ddl_time = utl_str2time(ORA_VAL(last_str_time)); 
+    } else {
+        logmsg(LOG_ERROR, "Unable to obtain last_ddl_time for [%s].[%s] (%s) -> no such object in all_objects", schema, object, type);
+        retval = EXIT_FAILURE;
+    }
+
+qry_last_ddl_time_cleanup:
+    ORA_STMT_FREE;
+    return retval;
+}
+
+
 int qry_object(char *schema, 
                char *type,
                char *object,
@@ -721,14 +785,20 @@ int qry_object(char *schema,
     is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
     is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
 
+    logmsg(LOG_DEBUG, "query %s: [%s].[%s]", object_type, object_schema, object_name); 
     if (g_conf.dbro == 0 || (g_conf.dbro == 1 && tfs_quick_validate(*fname) != EXIT_SUCCESS)) {
-        logmsg(LOG_DEBUG, "FULL OBJECT LOAD %s.%s", object_schema, object_name);
-        if (strcmp(object_type, "TABLE") == 0)
-            qry_object_all_tables(object_schema, object_name, *fname, &last_ddl_time);
-        else     
-            qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source, &last_ddl_time);
-    
-
+        
+        qry_last_ddl_time(object_schema, object_type, object_name, &last_ddl_time);
+        if (tfs_validate2(*fname, last_ddl_time) == EXIT_SUCCESS) {
+            logmsg(LOG_DEBUG, ".. got it from standard cache");
+        } else {     
+            if (strcmp(object_type, "TABLE") == 0)
+                qry_object_all_tables(object_schema, object_name, *fname);
+            else     
+                qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source);
+            logmsg(LOG_DEBUG, ".. got it from database");
+        }
+        
         // set standard file attributes on cached file (atime & mtime)
         newtime.actime = time(NULL);
         newtime.modtime = 0; // important. If this changes to anything else, we know that a write occured on
@@ -745,9 +815,10 @@ int qry_object(char *schema,
         } else {
             // (this si too verbose) logmsg(LOG_DEBUG, "qry_object() - set LDT for [%s] to [%d]", *fname, last_ddl_time);
         }
+    } else {
+        logmsg(LOG_DEBUG, ".. got it from quick cache");
     }
     
-    // cleanup
     free(object_schema);
     free(object_type);
     free(object_name);

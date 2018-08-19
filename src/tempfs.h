@@ -34,6 +34,11 @@ int tfs_rmfile(const char *cache_fn);
  * */
 int tfs_validate(const char *cache_fn, const char *last_ddl_time, time_t *actual_time);
 
+/**
+ * Exactly the same as tfs_validate, except it doesn't need to convert string time to time_t time
+ * */
+int tfs_validate2(const char *cache_fn, time_t last_ddl_time);
+
 /**                                                                                                                     
  * Check if cached file was modified/created at least once by this process. In readonly connection, we never want to
  * check with the database if the object has changed.

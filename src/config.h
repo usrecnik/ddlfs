@@ -18,8 +18,9 @@ struct s_global_config {
     int   lowercase;
     int   filesize;
     char *loglevel;
-    int   _server_version;
 
+    int    _server_version;
+    int    _isdba;
     pid_t  _mount_pid;
     time_t _mount_stamp;
 } g_conf;
