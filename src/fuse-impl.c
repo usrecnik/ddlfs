@@ -39,7 +39,7 @@ static void fs_path_free(char **part) {
 static int fs_path_create (char ***part, const char *path) {
     char **r;
     r = malloc(DEPTH_MAX * sizeof(char*));
-    
+
     for (int i = 0; i < DEPTH_MAX; i++)
         r[i] = NULL;
 
@@ -67,11 +67,11 @@ static void qry_any(int depth, t_fsentry *schema, t_fsentry *type) {
         case DEPTH_TYPE:
             qry_types(schema);
             break;
-        
+
         case DEPTH_OBJECT:
             qry_objects(schema, type);
             break;
-        
+
         default:
             logmsg(LOG_ERROR, "Invalid depth [%d]!", depth);
             break;
@@ -88,10 +88,10 @@ static int qry_dbro_cache(char **path, t_fsentry *type) {
             free(cache_fname);
         return EXIT_FAILURE;
     }
-    
+
     int retval = EXIT_FAILURE;
     if (tfs_quick_validate(cache_fname) == EXIT_SUCCESS) {
-        
+
         // get last_ddl_time from cache
         time_t last_ddl_time;
         if (tfs_getldt(cache_fname, &last_ddl_time, NULL, NULL) != EXIT_SUCCESS) {
@@ -114,16 +114,16 @@ static int qry_dbro_cache(char **path, t_fsentry *type) {
         t_fsentry *entry = vfs_entry_create(
             ftype, // F=valid (execution bit set), I=invalid
             path[DEPTH_OBJECT],
-            last_ddl_time, 
+            last_ddl_time,
             last_ddl_time);
         vfs_entry_add(type, entry);
         vfs_entry_sort(type);
         retval = EXIT_SUCCESS;
     }
-    
+
     if (cache_fname != NULL)
         free(cache_fname);
-  
+
     return retval;
 }
 
@@ -138,8 +138,8 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
     if (path[DEPTH_OBJECT] != NULL) {
         char *suffix = strrchr(path[DEPTH_OBJECT], '.');
         if (suffix == NULL)
-            return NULL; 
-        
+            return NULL;
+
         if (strcasecmp(suffix, ".JAVA") != 0 && strcasecmp(suffix, ".SQL") != 0)
             return NULL;
     }
@@ -158,7 +158,7 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
     }
     //---
 
-    // DEBUG 
+    // DEBUG
     /*
     logmsg(LOG_DEBUG, "-- path dump (loadFound=%d) --", loadFound);
     for (int i = 0; i < DEPTH_MAX; i++) {
@@ -170,7 +170,7 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
     logmsg(LOG_DEBUG, "-- end of path dump --");
     */
     // -- end of DEBUG --
-    
+
     t_fsentry *entries[DEPTH_MAX] = {NULL, NULL, NULL};
     for (int i = 0; i < DEPTH_MAX; i++) {
         if (path[i] == NULL) {
@@ -178,7 +178,7 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
                 qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
             return entries[i-1];
         }
-        
+
         entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
         if (entries[i] == NULL) {
             int used_dbro = 0;
@@ -187,15 +187,15 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
                 if (qry_dbro_cache(path, entries[DEPTH_TYPE]) != EXIT_SUCCESS) {
                     qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
                 }
-             } else 
+             } else
                 qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
-            
-            entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);            
+
+            entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
             if (used_dbro == 1 && entries[i] == NULL) {
                 logmsg(LOG_ERROR, "qry_dbro_cache failed to properly update g_vfs...");
                 vfs_dump(g_vfs, 0);
             }
-        } 
+        }
         if (entries[i] == NULL) {
             // logmsg(LOG_ERROR, "File not found, depth=[%d], path_part=[%s].", i, path[i]);
             return NULL;
@@ -211,7 +211,7 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
         }
     }
     g_vfs_last_schema = entries[DEPTH_SCHEMA];
-    
+
     return entries[DEPTH_MAX-1];
 }
 
@@ -243,7 +243,7 @@ int fs_getattr( const char *path, struct stat *st )
     }
 
     struct stat tmp_st;
-    tmp_st.st_size = g_conf.filesize; 
+    tmp_st.st_size = g_conf.filesize;
 
     if (depth == DEPTH_MAX) {
         char *fname;
@@ -258,7 +258,7 @@ int fs_getattr( const char *path, struct stat *st )
     st->st_atime = entry->modified;
     st->st_mtime = entry->modified; // /* Time of last modification */
     st->st_ctime = entry->modified; // /* Time of last status change */
-    
+
     if (entry->ftype == 'D') {
         st->st_nlink = 2;
         st->st_mode = S_IFDIR | 0644;
@@ -268,22 +268,22 @@ int fs_getattr( const char *path, struct stat *st )
         } else {
             if (entry->ftype == 'F')
                 st->st_mode = S_IFREG | 0744;
-            else 
+            else
                 st->st_mode = S_IFREG | 0644;
         }
-        
+
         st->st_nlink = 1;
         st->st_size = tmp_st.st_size;
     }
-    
+
     fs_path_free(part);
     return 0;
 }
 
-int fs_readdir(const char *path, 
-               void *buffer, 
-               fuse_fill_dir_t filler, 
-               off_t offset, 
+int fs_readdir(const char *path,
+               void *buffer,
+               fuse_fill_dir_t filler,
+               off_t offset,
                struct fuse_file_info *fi) {
 
     logmsg(LOG_DEBUG, "fuse-readdir: [%s]", path);
@@ -291,7 +291,7 @@ int fs_readdir(const char *path,
     char **part;
     fs_path_create(&part, path);
     t_fsentry *entry = fs_vfs_by_path(path, part, 1);
-    
+
     if (entry == NULL) {
         logmsg(LOG_DEBUG, "File not found for path [%s]", path);
         fs_path_free(part);
@@ -302,7 +302,7 @@ int fs_readdir(const char *path,
     filler(buffer, "..", NULL, 0);
     for (int i = 0; i < entry->count; i++)
         filler(buffer, entry->children[i]->fname, NULL, 0);
-    
+
     fs_path_free(part);
     return 0;
 }
@@ -326,7 +326,7 @@ static int fake_open(const char *path,
         fs_path_free(part);
         return -1;
     }
-    
+
     int fh;
     if (fi != NULL)
         fh = open(fname, O_RDWR);
@@ -334,30 +334,30 @@ static int fake_open(const char *path,
         fh = open(fname, O_RDONLY);
 
     if (fh < 0) {
-        logmsg(LOG_ERROR, "Unable to open [%s] for passthrough (%d)", 
+        logmsg(LOG_ERROR, "Unable to open [%s] for passthrough (%d)",
             fname, errno);
         if (fname != NULL)
             free(fname);
         fs_path_free(part);
         return -1;
     }
-    
+
     if (fname != NULL)
         free(fname);
     fs_path_free(part);
     return fh;
 }
 
-int fs_open(const char *path, 
+int fs_open(const char *path,
             struct fuse_file_info *fi) {
 
     if (strcmp(path, "/ddlfs.log") == 0) {
         fi->direct_io = 1;
         return 0;
     }
-    
+
     logmsg(LOG_INFO, "fuse-open: [%s]", path);
-    
+
     int fh = fake_open(path, fi);
     if (fh < 0) {
         logmsg(LOG_ERROR, "Unable to fs_open(%s).", path);
@@ -365,7 +365,7 @@ int fs_open(const char *path,
     }
     fi->direct_io = 1;
     fi->fh = fh;
-        
+
     return 0;
 }
 
@@ -376,7 +376,7 @@ static int fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_fil
     size_t len = strlen(g_ddl_log_buf);
     if (offset >= len)
         return 0;
-    
+
     if (offset + size > len) {
         memcpy(buf, g_ddl_log_buf + offset, len - offset);
         return len - offset;
@@ -386,14 +386,14 @@ static int fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_fil
     return size;
 }
 
-int fs_read(const char *path, 
-            char *buf, 
-            size_t size, 
+int fs_read(const char *path,
+            char *buf,
+            size_t size,
             off_t offset,
             struct fuse_file_info *fi) {
 
     logmsg(LOG_DEBUG, "fuse-read: [%s], offset=[%d]", path, offset);
-    
+
     int fd;
     int res;
 
@@ -401,10 +401,10 @@ int fs_read(const char *path,
         return fs_read_ddl_log(buf, size, offset, fi);
 
     if (fi == NULL)
-        fd = fake_open(path, NULL);    
+        fd = fake_open(path, NULL);
     else
         fd = fi->fh;
-    
+
     if (fd < 0) {
         logmsg(LOG_ERROR, "fuse-read failed, fd is negative (%d)", fd);
         return -ENOENT;
@@ -416,31 +416,31 @@ int fs_read(const char *path,
 
     if (fi == NULL )
         close(fd);
-    
+
     return res;
 }
 
-int fs_write(const char *path, 
-             const char *buf, 
-             size_t size, 
-             off_t offset, 
+int fs_write(const char *path,
+             const char *buf,
+             size_t size,
+             off_t offset,
              struct fuse_file_info *fi) {
     logmsg(LOG_INFO, "fuse-write: [%s]", path);
     int res = pwrite(fi->fh, buf, size, offset);
     if (res == -1)
         return -errno;
-    return res;    
+    return res;
 }
 
-int fs_release(const char *path, 
+int fs_release(const char *path,
                struct fuse_file_info *fi) {
-    
+
     int retval = 0;
     char **part = NULL;
     char *fname = NULL;
     char *object_name = NULL;
     char *object_schema = NULL;
-    struct stat tmp_stat; 
+    struct stat tmp_stat;
     size_t buf_len = 0;
     char *buf = NULL;
     int fd = -1;
@@ -456,7 +456,7 @@ int fs_release(const char *path,
     qry_object_fname(
         part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
 
-    if (strcmp(part[DEPTH_TYPE], "JAVA_SOURCE") == 0 || strcmp(part[DEPTH_TYPE], "java_source") == 0) 
+    if (strcmp(part[DEPTH_TYPE], "JAVA_SOURCE") == 0 || strcmp(part[DEPTH_TYPE], "java_source") == 0)
         is_java_source = 1;
 
     if (close(fi->fh) != 0) {
@@ -478,7 +478,7 @@ int fs_release(const char *path,
             logmsg(LOG_DEBUG, "fs_release() - no write occured even though file was opened as r/w.");
         } else {
             logmsg(LOG_DEBUG, "(temp file size is %d bytes)", tmp_stat.st_size);
-    
+
             buf_len = ((tmp_stat.st_size + (is_java_source * 350)) * sizeof(char)) + 1;
             buf = malloc(buf_len);
             if (buf == NULL) {
@@ -492,12 +492,12 @@ int fs_release(const char *path,
                 logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
                 return -ENOMEM;
             }
-        
+
             if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
                 logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
                 return -ENOMEM;
             }
-            
+
             logmsg(LOG_DEBUG, "Reading %d in buffer size %d, FD=%d", tmp_stat.st_size, buf_len, fi->fh);
             fd = open(fname, O_RDONLY);
             if (fd == -1) {
@@ -511,7 +511,7 @@ int fs_release(const char *path,
             if (is_java_source == 1)
                 newLenJava = sprintf(buf, "CREATE OR REPLACE AND COMPILE JAVA SOURCE NAMED \"%s\".\"%s\" AS\n",
                     object_schema, object_name);
-            
+
             size_t newLen = read(fd, buf+strlen(buf), tmp_stat.st_size);
             if (newLen == -1 || newLen != tmp_stat.st_size) {
                 logmsg(LOG_ERROR, "fs_release() - unable to read() [%s], errno=%d (%s) [%d]!=[%d]", fname, errno, strerror(errno), newLen, tmp_stat.st_size);
@@ -520,13 +520,16 @@ int fs_release(const char *path,
             }
             logmsg(LOG_DEBUG, "Read %d bytes", newLen);
             // newLen++;
-            buf[newLen+newLenJava] = '\0';
-    
+            if (is_java_source == 1)
+              buf[newLen+newLenJava-1] = '\0';
+            else
+              buf[newLen] = '\0';
+
             if (newLen == 0)
                 logmsg(LOG_DEBUG, "Skipping execution of DDL as input file size is 0.");
-            else 
+            else
                 qry_exec_ddl(object_schema, object_name, buf);
-            
+
             if (tfs_rmfile(fname) != EXIT_SUCCESS) {
                 logmsg(LOG_ERROR, "fs_release - unable to remove cache file [%s] after DDL.", fname);
             }
@@ -536,14 +539,14 @@ int fs_release(const char *path,
 
     // @todo - consider *never* deleting this file here (and delete all temp files on umount).
     if (g_conf.filesize != -1) {
-        // delete temp file. g_conf.filesie=-1 means exact filesizes. deleting this file would 
-        // invalidate cached files (which would be cause a bit of performance degradation, 
+        // delete temp file. g_conf.filesie=-1 means exact filesizes. deleting this file would
+        // invalidate cached files (which would be cause a bit of performance degradation,
         // functionally it wold be ok)
-        
+
         if ((cache_already_removed == 0) && (tfs_rmfile(fname) != EXIT_SUCCESS))
             logmsg(LOG_ERROR, "fs_release - unable to remove cached file [%s]", fname);
     }
-    
+
 fs_release_final:
 
     if (fd != -1)
@@ -561,12 +564,12 @@ fs_release_final:
 
     fs_path_free(part);
     free(fname);
-    
+
     return retval;
 }
 
 
-int fs_create (const char *path, 
+int fs_create (const char *path,
                mode_t mode,
                struct fuse_file_info *fi) {
 
@@ -579,10 +582,10 @@ int fs_create (const char *path,
     char empty_ddl[1024] = "";
     logmsg(LOG_INFO, "fs_create() - [%s]", path);
 
-    
+
     if (fs_getattr(path, &st) == -ENOENT) {
         logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
-        
+
         depth = fs_path_create(&part, path);
 
         if (str_fn2obj(&object_type, part[DEPTH_TYPE], NULL) != EXIT_SUCCESS) {
@@ -596,13 +599,13 @@ int fs_create (const char *path,
             fs_path_free(part);
             return -ENOMEM;
         }
-        
+
         if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
             fs_path_free(part);
             return -ENOMEM;
         }
-         
+
         if (depth != 3) {
             logmsg(LOG_ERROR, "Creating of new objects is only allowed on depth level 3");
             fs_path_free(part);
@@ -610,11 +613,11 @@ int fs_create (const char *path,
         }
 
         if (strcmp(object_type, "PROCEDURE") == 0)
-            snprintf(empty_ddl, 1023, "CREATE PROCEDURE \"%s\".\"%s\" AS\nBEGIN\n    NULL;\nEND;", 
+            snprintf(empty_ddl, 1023, "CREATE PROCEDURE \"%s\".\"%s\" AS\nBEGIN\n    NULL;\nEND;",
                 object_schema, object_name);
         else if (strcmp(object_type, "FUNCTION") == 0)
             snprintf(empty_ddl, 1023, "CREATE FUNCTION \"%s\".\"%s\" RETURN NUMBER AS\nBEGIN\n    RETURN NULL;\nEND;",
-                object_schema, object_name);    
+                object_schema, object_name);
         else if (strcmp(object_type, "VIEW") == 0)
             snprintf(empty_ddl, 1023, "CREATE VIEW \"%s\".\"%s\" AS\nSELECT * FROM dual",
                 object_schema, object_name);
@@ -638,27 +641,27 @@ int fs_create (const char *path,
 
             fs_path_free(part);
             // @todo - support other object types
-            return -EINVAL; // invalid argument 
+            return -EINVAL; // invalid argument
         }
-        
+
         qry_exec_ddl(object_schema, object_name, empty_ddl);
 
         fs_path_free(part);
     }
-    
+
     if (object_type != NULL)
         free(object_type);
-    
+
     if (object_name != NULL)
         free(object_name);
-   
+
     if (object_schema != NULL)
         free(object_schema);
-    
+
     return fs_open(path, fi);
 }
 
-int fs_truncate(const char *path, 
+int fs_truncate(const char *path,
                 off_t size
                 /* struct fuse_file_info *fi - in newer fuse */) {
     logmsg(LOG_INFO, "fs_truncate() - [%s]", path);
@@ -666,7 +669,7 @@ int fs_truncate(const char *path,
     char **part;
     int depth = fs_path_create(&part, path);
     char *fname;
-    
+
     if (depth != DEPTH_MAX) {
         logmsg(LOG_ERROR, "fs_truncate() - you can only truncate files in depth 3 (sql files)");
         fs_path_free(part);
@@ -680,7 +683,7 @@ int fs_truncate(const char *path,
         free(fname);
         return -errno;
     }
- 
+
     fs_path_free(part);
     free(fname);
     return 0;
@@ -688,15 +691,15 @@ int fs_truncate(const char *path,
 
 int fs_unlink(const char *path) {
     logmsg(LOG_INFO, "fs_unlink() - [%s]", path);
-    
+
     char **part;
     int depth = fs_path_create(&part, path);
     char drop_ddl[1024] = "";
     char *object_type = NULL;
     char *object_name = NULL;
     char *object_schema = NULL;
-       
- 
+
+
     if (depth != 3) {
         logmsg(LOG_ERROR, "Cannot unlink objects which are not at level 3");
         fs_path_free(part);
@@ -717,9 +720,9 @@ int fs_unlink(const char *path) {
         fs_path_free(part);
         return -ENOMEM;
     }
-        
+
     if (strcmp(object_type, "PROCEDURE") == 0)
-        snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"", 
+        snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"",
             object_schema, object_name);
     else if (strcmp(object_type, "FUNCTION") == 0)
         snprintf(drop_ddl, 1023, "DROP FUNCTION \"%s\".\"%s\"",
@@ -743,13 +746,13 @@ int fs_unlink(const char *path) {
         snprintf(drop_ddl, 1023, "DROP JAVA SOURCE \"%s\".\"%s\"",
             object_schema, object_name);
     else {
-        logmsg(LOG_ERROR, "Cannot drop object %s.%s, operation not (yet?) supported.", 
+        logmsg(LOG_ERROR, "Cannot drop object %s.%s, operation not (yet?) supported.",
             part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
         fs_path_free(part);
         return -EINVAL;
     }
     fs_path_free(part);
-    
+
     qry_exec_ddl(object_schema, object_name, drop_ddl);
 
     if (object_type != NULL)

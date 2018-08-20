@@ -52,16 +52,16 @@ int str_suffix(char **dst, const char *objectType) {
     char *suffix = calloc(10, sizeof(char));
     char *type = strdup(objectType);
     if (suffix == NULL || type == NULL) {
-        logmsg(LOG_ERROR, "str_suffix() - unable to malloc suffix and/or type."); 
+        logmsg(LOG_ERROR, "str_suffix() - unable to malloc suffix and/or type.");
         if (suffix != NULL)
             free(suffix);
         if (type != NULL)
             free(type);
         return EXIT_FAILURE;
     }
-    
+
     str_upper(type);
-     
+
     if (strcmp(type, "JAVA_SOURCE") == 0)
         strcpy(suffix, ".JAVA");
     else if (strcmp(type, "JAVA_CLASS") == 0)
@@ -70,7 +70,7 @@ int str_suffix(char **dst, const char *objectType) {
         strcpy(suffix, ".RES"); // might be anything really, like .properties, .xml, .ini, ...
     else
         strcpy(suffix, ".SQL");
-    free(type); 
+    free(type);
     // logmsg(LOG_DEBUG, "str_suffix() - returning suffix [%s] for type [%s]", suffix, type);
 
     *dst = suffix;
@@ -88,7 +88,7 @@ int qry_object_fname(const char *schema,
         logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", PATH_MAX);
         return EXIT_FAILURE;
     }
-    snprintf(*fname, PATH_MAX, "%s/ddlfs-%s.%s.%s.tmp", 
+    snprintf(*fname, PATH_MAX, "%s/ddlfs-%s.%s.%s.tmp",
         g_conf._temppath, schema, type, object);
     return EXIT_SUCCESS;
 }
@@ -101,16 +101,16 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
     }
     if (g_conf.lowercase)
         str_upper(*dst);
-    
+
     if (objectType != NULL) {
-        char *expectedSuffix = NULL;       
+        char *expectedSuffix = NULL;
         char *actualSuffix = NULL;
-        
+
         if (str_suffix(&expectedSuffix, objectType) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "Unable to obtain suffix for object type [%s].", objectType);
             return EXIT_FAILURE;
         }
-    
+
         // safety check
         int len = strlen(*dst);
         int expectedLen = strlen(expectedSuffix);
@@ -119,18 +119,18 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
             free(expectedSuffix);
             return EXIT_FAILURE;
         }
-        
+
         actualSuffix = calloc(expectedLen+1, sizeof(char));
         if (actualSuffix == NULL) {
             logmsg(LOG_ERROR, "str_fn2obj() - unable to malloc actualSuffix, size=[%d]", expectedLen);
             return EXIT_FAILURE;
         }
-        
+
         for (int i = 0; i < expectedLen; i++) {
             int c = len-i-1;
             if (c < 0)
                 actualSuffix[i] = '\0';
-            else 
+            else
                 actualSuffix[expectedLen-1-i] = (*dst)[c];
         }
         actualSuffix[expectedLen] = '\0';
@@ -140,20 +140,20 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
             free(expectedSuffix);
             return EXIT_FAILURE;
         }
-        
+
         // actually remove '.sql' suffix:
         (*dst)[strlen(*dst)-expectedLen] = '\0';
 
         free(actualSuffix);
         free(expectedSuffix);
     }
-    
+
     return 0;
 }
 
 static int str_fs2oratype(char **fstype) {
     char *type = *fstype;
-    
+
     if (strcmp(type, "PACKAGE_SPEC") == 0) {
         free(type);
         type = strdup("PACKAGE");
@@ -175,21 +175,21 @@ static int str_fs2oratype(char **fstype) {
         logmsg(LOG_ERROR, "str_fs2oratype() - unable to malloc for normalized type.");
         return EXIT_FAILURE;
     }
-    
+
     *fstype = type;
     return EXIT_SUCCESS;
 }
 
-/*static int qry_object_dbms_metadata(const char *schema, 
-                                    const char *type, 
-                                    const char *object,                                   
+/*static int qry_object_dbms_metadata(const char *schema,
+                                    const char *type,
+                                    const char *object,
                                     const char *fname,
                                     const int is_java_source,
                                     const int is_trigger_source,
                                           time_t *last_ddl_time) {
-    
+
     int retval = EXIT_SUCCESS;
-    char *query = 
+    char *query =
 "select \
 dbms_metadata.get_ddl(o.object_type, o.object_name, o.owner), \
 to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') \
@@ -201,7 +201,7 @@ and o.owner=:bind_schema";
     OCILobLocator *o_lob = NULL; // free
     OCIStmt       *o_stm = NULL; // free
     OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
-    OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when 
+    OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when
     OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
     OCIBind       *o_bn3 = NULL;
     char          *o_sel = NULL;
@@ -211,10 +211,10 @@ and o.owner=:bind_schema";
     oraub8 buf_blen = LOB_BUFFER_SIZE;
     oraub8 buf_clen = 0;
     int lob_offset = 1;
-    
-    FILE *fp = NULL; // free    
+
+    FILE *fp = NULL; // free
     size_t bytes_written;
-    
+
     if (buf == NULL) {
         logmsg(LOG_ERROR, "Unable to malloc lob buffer (size=%d).", LOB_BUFFER_SIZE);
         retval = EXIT_FAILURE;
@@ -226,17 +226,17 @@ and o.owner=:bind_schema";
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
     }
-    
+
     if (ora_lob_alloc(&o_lob)) {
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
     }
-    
+
     if (ora_stmt_prepare(&o_stm, query)) {
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
     }
-      
+
     if (ora_stmt_define(o_stm, &o_def, 1, &o_lob, 0, SQLT_CLOB)) {
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
@@ -266,12 +266,12 @@ and o.owner=:bind_schema";
         retval = EXIT_FAILURE;
         goto qry_object_dbms_metadata_cleanup;
     }
-    
+
     if (tfs_validate(fname, o_sel, last_ddl_time) == EXIT_SUCCESS) {
         // logmsg(LOG_DEBUG, "qry_object_dbms_metadata - tempfile [%s] is up2date.");
         goto qry_object_dbms_metadata_cleanup; // this is a bit ugly, but it's short and it works :)
     }
-    
+
     fp = fopen(fname, "w");
     if (fp == NULL) {
         logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
@@ -279,7 +279,7 @@ and o.owner=:bind_schema";
         goto qry_object_dbms_metadata_cleanup;
     }
 
-    int trg_last_nl_pos = -1; 
+    int trg_last_nl_pos = -1;
     int first = 1;
     int first_offset = 0;
     int all_bytes_written = 0;
@@ -289,7 +289,7 @@ and o.owner=:bind_schema";
                 g_connection.svc,
                 g_connection.err,
                 o_lob,
-                &buf_blen, 
+                &buf_blen,
                 &buf_clen,
                 lob_offset, // offset
                 buf,
@@ -313,48 +313,48 @@ and o.owner=:bind_schema";
                     if (buf[first_offset] == '\n' || buf[first_offset] == '\r')
                         break;
             }
-            
+
             // trim leading spaces and newlines. I'm not sure why dbms_metadata
             // writes them anyway as they are totaly useless.
-            for (; first_offset < buf_blen; first_offset++) 
+            for (; first_offset < buf_blen; first_offset++)
                 if (buf[first_offset] != ' ' && buf[first_offset] != '\n' && buf[first_offset] != '\r')
-                    break;            
-            
+                    break;
+
             bytes_written = fwrite(buf + first_offset, 1, buf_blen - first_offset, fp);
             buf_blen -= first_offset;
-        } else { 
+        } else {
             bytes_written = fwrite(buf, 1, buf_blen, fp);
         }
-        
+
         if (bytes_written != buf_blen) {
             retval = EXIT_FAILURE;
-            logmsg(LOG_ERROR, "Bytes written (%d) != Bytes read (%d)", 
+            logmsg(LOG_ERROR, "Bytes written (%d) != Bytes read (%d)",
                 bytes_written, buf_blen);
             goto qry_object_dbms_metadata_cleanup;
         }
-        
+
         if (is_trigger_source) {
             // find position of last newline in this file, dbms_metadata.get_ddl appends additional alter trigger after it (we need to remove it).
             char *trgbuf = buf;
             if (first)
                 trgbuf += first_offset;
-            
+
             for (int i = 0; i < bytes_written; i++) {
                 if (trgbuf[i] == '\n') {
                     trg_last_nl_pos = all_bytes_written + i;
                 }
             }
         }
-    
+
         first = 0;
         all_bytes_written += bytes_written;
     }
 
     // close (implicit flush) the file
     if (fclose(fp) != 0)
-        logmsg(LOG_ERROR, "qry_object_dbms_metadata() - unable to close FILE*");    
+        logmsg(LOG_ERROR, "qry_object_dbms_metadata() - unable to close FILE*");
     fp = NULL;
-    
+
     if (is_trigger_source) {
         // remove last line from cached file (text to remove after last newline should be "ALTER TRIGGER "<OWNER>"."<TRIGGER>" ENABLE")
         if (truncate(fname, trg_last_nl_pos) != 0) {
@@ -363,12 +363,12 @@ and o.owner=:bind_schema";
         }
     }
 
-    
+
 qry_object_dbms_metadata_cleanup:
 
     if (buf != NULL)
         free(buf);
-    
+
     if (o_lob != NULL)
         ora_lob_free(o_lob);
 
@@ -380,12 +380,12 @@ qry_object_dbms_metadata_cleanup:
 
     if ( (fp != NULL) && (fclose(fp) != 0) )
         logmsg(LOG_ERROR, "qry_object_dbms_metadata() - Unable to close FILE* (cleanup)");
-    
+
     return retval;
 }
 */
 
-static int qry_object_all_source(const char *schema, 
+static int qry_object_all_source(const char *schema,
                                        char *type,
                                  const char *object,
                                  const char *fname,
@@ -407,7 +407,7 @@ static int qry_object_all_source(const char *schema,
  join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
  where w.view_name=:bind_object and w.owner=:bind_schema");
         } else {
-            strcpy(query, 
+            strcpy(query,
 // 11g ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s,\
  o.status,\
@@ -420,7 +420,7 @@ static int qry_object_all_source(const char *schema,
         }
     } else {
         if (is_view_source) {
-            strcpy(query, 
+            strcpy(query,
 // 12c ALL_VIEWS
 "select w.text as s,\
  o.status,\
@@ -429,7 +429,7 @@ static int qry_object_all_source(const char *schema,
  join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
  where w.view_name=:bind_object and w.owner=:bind_schema");
         } else {
-            strcpy(query, 
+            strcpy(query,
 // 12c ALL_OBJECTS
 "select nvl(s.\"TEXT\", '\n') as s,\
  o.status,\
@@ -441,7 +441,7 @@ static int qry_object_all_source(const char *schema,
  order by s.\"LINE\"");
         }
     }
-    
+
     ORA_STMT_PREPARE (qry_object_all_source);
     ORA_STMT_DEFINE_STR_I(qry_object_all_source, 1, text,        4*1024*1024);
     ORA_STMT_DEFINE_STR_I(qry_object_all_source, 2, valid,       10);
@@ -450,7 +450,7 @@ static int qry_object_all_source(const char *schema,
     ORA_STMT_BIND_STR(qry_object_all_source, 2, object);
     ORA_STMT_BIND_STR(qry_object_all_source, 3, schema);
     ORA_STMT_EXECUTE(qry_object_all_source, 0);
-    
+
     char tmpstr[4096];
     size_t bytes_written;
     FILE *fp = NULL;
@@ -461,28 +461,28 @@ static int qry_object_all_source(const char *schema,
     char editionable[30] = "";
     int row_count = 0;
     int validity = -1; // -1=unknown, 0=>valid, 1=>invalid;
-    
+
     for(; *tmp != '\0'; tmp++)
         if (*tmp == ' ')
             type_spaces++;
 
     while (ORA_STMT_FETCH) {
         row_count++;
-        
+
         if (first) {
-            
+
             if (strcmp(ORA_NVL(valid, "INVALID"), "VALID") == 0)
                 validity = 0;
             else
                 validity = 1;
-             
+
             if (strcmp(ORA_NVL(editionable, "X"), "Y") == 0)
                  strcpy(editionable, " EDITIONABLE");
-            else if (strcmp(ORA_NVL(editionable, "X"), "N") == 0) 
+            else if (strcmp(ORA_NVL(editionable, "X"), "N") == 0)
                 strcpy(editionable, " NONEDITIONABLE");
             else
                 strcpy(editionable, ""); // object cannot be editioned at all (like tables for example)
-                         
+
             fp = fopen(fname, "w");
             if (fp == NULL) {
                 logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
@@ -496,38 +496,38 @@ static int qry_object_all_source(const char *schema,
             }
 
         }
-        
+
         if (first && is_view_source) {
             sprintf(tmpstr, "CREATE OR REPLACE FORCE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
 
             if (i_text < 0) { // TEXT is null
                 // TEXT (datatype=LONG): View text. This column returns the correct value only when the row originates
-                // from the current container. The BEQUEATH clause will not appear as part of the TEXT column in 
-                // this view.                 
+                // from the current container. The BEQUEATH clause will not appear as part of the TEXT column in
+                // this view.
                 strcpy(tmpstr, "   /* this view source is stored in another container */\n   select * from dual");
                 fwrite(tmpstr, 1, strlen(tmpstr), fp);
                 break;
             }
         }
-        
+
         if (first && is_trigger_source) {
             sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".\"%s\" ", editionable, type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
-             
+
             // replace everything before 'BEFORE', 'AFTER', 'INSTEAD' with:
             // 'create or replace <editionable> trigger "<owner>"."<trigger-name>" '
             // DEBUG: trigger bucket_racuni_instead instead of update or delete or insert on bucket_racuni
             char *kw_all[3] = {"BEFORE", "AFTER", "INSTEAD"};
-            char *kw_which = NULL; // which keyword out of kw_all was found, one of the 3 strings in kw_all 
+            char *kw_which = NULL; // which keyword out of kw_all was found, one of the 3 strings in kw_all
             char *kw_found = NULL; // return value form strcasestr, where did we found the kw_which
             char *kw_after = NULL; // char after keyword (it must be whitespace char, otherwise we found something that is not really a keyword)
-            char *kw_before = NULL; 
+            char *kw_before = NULL;
             int line = 1;
             while (kw_found == NULL) {
-                
+
                 for (int i = 0; i < 3; i++) {
-                    
+
                     char *kw_haystack = ORA_NVL(text, " ");
 
                     trigger_retry_keyword:
@@ -537,14 +537,14 @@ static int qry_object_all_source(const char *schema,
                         kw_after = kw_found + strlen(kw_which);
                         kw_before = (kw_found == kw_haystack ? NULL : kw_found - 1);
 
-                        if ((kw_after[0] != ' ' && kw_after[0] != '\n' && kw_after[0] != '\r' && kw_after[0] != '\t') || 
+                        if ((kw_after[0] != ' ' && kw_after[0] != '\n' && kw_after[0] != '\r' && kw_after[0] != '\t') ||
                             (kw_before != NULL && kw_before[0] != ' ' && kw_before[0] != '\n' && kw_before[0] != '\r' && kw_before[0] != '\t')) {
                             // so, this is not really a keyword
                             kw_haystack += strlen(kw_which);
                             kw_which = NULL;
                             kw_after = NULL;
                             kw_before = NULL;
-                            kw_found = NULL;                            
+                            kw_found = NULL;
                             goto trigger_retry_keyword;
                         }
                     }
@@ -574,7 +574,7 @@ static int qry_object_all_source(const char *schema,
             first=0;
             continue;
         }
-        
+
         if (first && !is_view_source && !is_java_source && !is_trigger_source) {
             // replace multiple spaces with single space
             org = ORA_NVL(text, " ");
@@ -582,7 +582,7 @@ static int qry_object_all_source(const char *schema,
             while (*tmp != '\0') {
                 while (*tmp == ' ' && *(tmp + 1) == ' ')
                     tmp++;
-                
+
                 *(org++) = *(tmp++);
             }
             *org = '\0';
@@ -596,14 +596,14 @@ static int qry_object_all_source(const char *schema,
                 if (*tmp == ' ')
                     tmp++;
             }
-            
+
             bytes_written = fwrite(tmp, 1, strlen(tmp), fp);
             if (bytes_written != strlen(tmp)) {
                 retval = EXIT_FAILURE;
                 logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(tmp));
                 goto qry_object_all_source_cleanup;
             }
-            
+
         } else {
             bytes_written = fwrite(ORA_NVL(text, ""), 1, strlen(ORA_NVL(text, "")), fp);
             if (bytes_written != strlen(ORA_NVL(text, ""))) {
@@ -611,9 +611,17 @@ static int qry_object_all_source(const char *schema,
                 logmsg(LOG_ERROR, "qry_object_all_source() - Bytes written (%d) != Bytes read (%d)", bytes_written, strlen(ORA_NVL(text, "")));
                 goto qry_object_all_source_cleanup;
             }
-            
-            if (is_java_source)
-                fwrite("\n", 1, 1, fp);
+
+            if (is_java_source) {
+                // not every line of java source has nl character at the end.
+                // it seems that only empty lines include newline character.
+                char *java_line = ORA_NVL(text, "");
+                char java_last = 'x';
+                if (strlen(java_line) > 0)
+                    java_last = java_line[strlen(java_line)-1];
+                if (java_last != 10)
+                  fwrite("\n", 1, 1, fp);
+            }
         }
 
         first=0;
@@ -633,7 +641,7 @@ static int qry_object_all_source(const char *schema,
                          3 METADATA LINK   SYS        WWV_DBMS_SQL
 
         */
-        
+
         fp = fopen(fname, "w");
         if (fp == NULL) {
             logmsg(LOG_ERROR, "Unable to open %s. Error=%d (%s).", fname, errno, strerror(errno));
@@ -643,7 +651,7 @@ static int qry_object_all_source(const char *schema,
         char empty_msg[] = "-- source for this object not found in all_source view.\n";
         fwrite(empty_msg, 1, strlen(empty_msg), fp);
     }
-    
+
     chmod(fname, validity == 0 ? 0744 : 0644);
 
 qry_object_all_source_cleanup:
@@ -651,7 +659,7 @@ qry_object_all_source_cleanup:
 
     if ( (fp != NULL) && (fclose(fp) != 0) )
         logmsg(LOG_ERROR, "qry_object_all_source() - Unable to close FILE* (qry_object_cleanup)");
-    
+
     return retval;
 }
 
@@ -661,21 +669,21 @@ static int qry_last_ddl_time(const char *schema,
                              const char *object,
                              time_t *last_ddl_time /* out */) {
 
-    const char *query_user = 
+    const char *query_user =
 "select to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
  from all_objects where owner=:schema and object_type=:type and object_name=:name";
 
-    const char *query_dba = // @todo - do the decode part on client 
+    const char *query_dba = // @todo - do the decode part on client
 "select o.mtime\
  from sys.obj$ o\
  join sys.user$ u on u.user# = o.owner#\
  where u.name=:schema and o.type#=:type and o.name=:name";
-    
+
     const char *query = (g_conf._isdba == 1 ? query_dba : query_user);
-    
+
     int retval = EXIT_SUCCESS;
     int type_id = 0;
-    
+
     if (strcmp(type, "TABLE") == 0)
         type_id = 2;
     else if (strcmp(type, "VIEW") == 0)
@@ -698,8 +706,8 @@ static int qry_last_ddl_time(const char *schema,
         type_id = 28;
     else if (strcmp(type, "MATERIALIZED VIEW") == 0)
         type_id = 42; // @todo - mv are not yet supported.
-    
-    OCIBind *o_bn2; 
+
+    OCIBind *o_bn2;
     ORA_STMT_PREPARE(qry_last_ddl_time);
     ORA_STMT_DEFINE_STR(qry_last_ddl_time, 1, last_str_time, 30);
     ORA_STMT_BIND_STR(qry_last_ddl_time, 1, schema);
@@ -716,7 +724,7 @@ static int qry_last_ddl_time(const char *schema,
     ORA_STMT_BIND_STR(qry_last_ddl_time, 3, object);
     ORA_STMT_EXECUTE(qry_last_ddl_time, 0);
     if (ORA_STMT_FETCH) {
-        *last_ddl_time = utl_str2time(ORA_VAL(last_str_time)); 
+        *last_ddl_time = utl_str2time(ORA_VAL(last_str_time));
     } else {
         logmsg(LOG_ERROR, "Unable to obtain last_ddl_time for [%s].[%s] (%s) -> no such object in all_objects", schema, object, type);
         retval = EXIT_FAILURE;
@@ -728,7 +736,7 @@ qry_last_ddl_time_cleanup:
 }
 
 
-int qry_object(char *schema, 
+int qry_object(char *schema,
                char *type,
                char *object,
                char **fname) {
@@ -741,13 +749,13 @@ int qry_object(char *schema,
     int is_trigger_source = 0;
     struct utimbuf newtime;
     time_t last_ddl_time = 0;
-        
+
     // determine fname
     if (qry_object_fname(schema, type, object, fname) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object_all_source() - unable to determine filename, qry_object_fname() failed.");
         return EXIT_FAILURE;
     }
-    
+
     // normalize parameters
     if (str_fn2obj(&object_schema, schema, NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object() - unable to normalize object_schema.");
@@ -764,7 +772,7 @@ int qry_object(char *schema,
         if (object_name != NULL) free(object_name);
         return EXIT_FAILURE;
     }
-    
+
     if (str_fn2obj(&object_name, object, type) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object() - unable to normalize object_name.");
         if (object_schema != NULL) free(object_schema);
@@ -781,24 +789,24 @@ int qry_object(char *schema,
         if (object_name != NULL) free(object_name);
         return EXIT_FAILURE;
     }
-    
+
     is_java_source = ((strcmp(object_type, "JAVA SOURCE") == 0) ? 1 : 0);
     is_trigger_source = ((strcmp(object_type, "TRIGGER") == 0) ? 1 : 0);
 
-    logmsg(LOG_DEBUG, "query %s: [%s].[%s]", object_type, object_schema, object_name); 
+    logmsg(LOG_DEBUG, "query %s: [%s].[%s]", object_type, object_schema, object_name);
     if (g_conf.dbro == 0 || (g_conf.dbro == 1 && tfs_quick_validate(*fname) != EXIT_SUCCESS)) {
-        
+
         qry_last_ddl_time(object_schema, object_type, object_name, &last_ddl_time);
         if (tfs_validate2(*fname, last_ddl_time) == EXIT_SUCCESS) {
             logmsg(LOG_DEBUG, ".. got it from standard cache");
-        } else {     
+        } else {
             if (strcmp(object_type, "TABLE") == 0)
                 qry_object_all_tables(object_schema, object_name, *fname);
-            else     
+            else
                 qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source);
             logmsg(LOG_DEBUG, ".. got it from database");
         }
-        
+
         // set standard file attributes on cached file (atime & mtime)
         newtime.actime = time(NULL);
         newtime.modtime = 0; // important. If this changes to anything else, we know that a write occured on
@@ -818,11 +826,11 @@ int qry_object(char *schema,
     } else {
         logmsg(LOG_DEBUG, ".. got it from quick cache");
     }
-    
+
     free(object_schema);
     free(object_type);
     free(object_name);
-    
+
     return retval;
 }
 
@@ -837,7 +845,7 @@ int qry_schemas() {
     int pos_in, pos_like;
     int        o_bnd_idx = 0;
     char tmp[50]; // for converting int to char*
-    
+
     // build query
     pos_in = 0;
     pos_like = 0;
@@ -848,7 +856,7 @@ int qry_schemas() {
                 str_append(&query_in, ", ");
             str_append(&query_in, ":bi_");
             snprintf(tmp, 50, "%d",pos_in++);
-            str_append(&query_in, tmp); 
+            str_append(&query_in, tmp);
             bind_in[bind_in_i] = strdup(token);
             bind_in_i++;
         } else {
@@ -861,7 +869,7 @@ int qry_schemas() {
             bind_like_i++;
         }
         token = strtok(NULL, ":");
-        
+
         if (bind_in_i >= 100 || bind_like_i >= 100) {
             logmsg(LOG_ERROR, "Specified more than maximum number of schemas (allowed: 100x like, 100x in; got %dx in, %dx like", bind_in_i, bind_like_i);
             return EXIT_FAILURE;
@@ -885,7 +893,7 @@ int qry_schemas() {
         logmsg(LOG_ERROR, "Seems like no schemas is given in parameter?!");
     }
     str_append(&query, " ORDER BY username");
-    
+
     // logmsg(LOG_DEBUG, "query=[%s]", query);
     // prepare and execute sql statement
 
@@ -895,7 +903,7 @@ int qry_schemas() {
 
     for (int i = 0; i < bind_in_i; i++) {
         o_bnd_idx++;
-        ORA_STMT_BIND_STR(qry_schemas, o_bnd_idx, bind_in[i]);         
+        ORA_STMT_BIND_STR(qry_schemas, o_bnd_idx, bind_in[i]);
         //o_bnd_idx++;
     }
 
@@ -905,13 +913,13 @@ int qry_schemas() {
     }
 
     ORA_STMT_EXECUTE(qry_schemas, 0);
-     
+
     // vfs_entry_free(g_vfs, 1);
-    
+
     while (ORA_STMT_FETCH) {
         if (g_conf.lowercase)
             str_lower((char*) o_username);
-    
+
         // convert created date
         struct tm *temptime = malloc(sizeof(struct tm));
         if (temptime == NULL) {
@@ -926,11 +934,11 @@ int qry_schemas() {
             retval = EXIT_FAILURE;
             free(temptime);
             goto qry_schemas_cleanup;
-        }                                                                            
+        }
         time_t created_time = timegm(temptime);
         free(temptime);
         // end of date conversion
-        
+
         t_fsentry *entry = vfs_entry_create('D', o_username, created_time, created_time);
         t_fsentry *exists = vfs_entry_search(g_vfs, entry->fname);
         if (exists == NULL)
@@ -943,9 +951,9 @@ int qry_schemas() {
     t_fsentry *exists = vfs_entry_search(g_vfs, ddllog->fname);
     if (exists == NULL)
         vfs_entry_add(g_vfs, ddllog);
-    else 
+    else
         vfs_entry_free(ddllog, 0);
-    
+
     vfs_entry_sort(g_vfs);
 
 
@@ -958,25 +966,25 @@ qry_schemas_cleanup:
 
     if (query_in != NULL)
         free(query_in);
-    
+
     if (query_like != NULL)
         free(query_like);
 
     if (o_stm != NULL)
         ora_stmt_free(o_stm);
-    
+
     for (int i = 0; i < bind_in_i; i++)
         free(bind_in[i]);
-   
+
      for (int i = 0; i < bind_like_i; i++)
         free(bind_like[i]);
-     
+
     return retval;
 }
 
 int qry_types(t_fsentry *schema) {
     vfs_entry_free(schema, 1);
-    
+
     char *types[] = {
         "function",
         "java_source",
@@ -1006,25 +1014,25 @@ int qry_types(t_fsentry *schema) {
     }
     time_t fixed_date = timegm(temptime);
     free(temptime);
-    
+
     for (int i = 0; types[i] != NULL; i++) {
         char *type = strdup(types[i]);
         if (type == NULL) {
             logmsg(LOG_ERROR, "qry_types() - unable to strdup type");
             return EXIT_FAILURE;
         }
-        
+
         if (g_conf.lowercase)
             str_lower(type);
         else
             str_upper(type);
-        
+
         vfs_entry_add(schema, vfs_entry_create('D', type, fixed_date, fixed_date));
         free(type);
     }
-    
-    vfs_entry_sort(schema);    
-    
+
+    vfs_entry_sort(schema);
+
     return EXIT_SUCCESS;
 }
 
@@ -1032,7 +1040,7 @@ static int qry_objects_filesize(t_fsentry *schema, t_fsentry *type) {
     for (int i = 0; i < type->count; i++) {
         t_fsentry *object = type->children[i];
         char *fname; // physical temp file name
-        
+
         qry_object(schema->fname, type->fname, object->fname, &fname);
 
         struct stat st;
@@ -1073,13 +1081,13 @@ from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type and ge
         str_upper(schema_name);
         str_upper(type_name);
     }
-    
+
     if ((strcmp(schema_name, "SYS") == 0) && (strcmp(type_name, "TYPE") == 0)) {
         strcat(query, " and exists (\
 select 1 from all_source s \
 where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
     }
-    
+
     if (str_suffix(&suffix, type_name) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to obtain suffix for object type [%s]", type_name);
         if (type_name != NULL)
@@ -1101,7 +1109,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         return EXIT_FAILURE;
     }
 
-    struct tm *temptime = malloc(sizeof(struct tm)); 
+    struct tm *temptime = malloc(sizeof(struct tm));
 
     vfs_entry_free(type, 1);
 
@@ -1110,7 +1118,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
             logmsg(LOG_ERROR, "Unable to allocate memory for sel[%d]", i);
             return EXIT_FAILURE;
     }
-    
+
     if (ora_stmt_prepare(&o_stm, query)) {
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
@@ -1155,7 +1163,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
             retval = EXIT_FAILURE;
             goto qry_objects_cleanup;
         }
-        
+
         time_t t_modified = timegm(temptime);
         size_t fname_len = ((strlen((char*)o_sel[0])+strlen(suffix))+1)*sizeof(char);
         char *fname = malloc(fname_len);
@@ -1166,7 +1174,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         }
         strcpy(fname, (char*) o_sel[0]);
         strcat(fname, suffix);
-         
+
         if (g_conf.lowercase)
             str_lower(fname);
 
@@ -1174,7 +1182,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         char *tmp = fname;
         int has_slash = 0;
         while (*tmp != '\0')
-            if (*(tmp++) == '/') 
+            if (*(tmp++) == '/')
                 has_slash = 1;
 
         if (has_slash) {
@@ -1183,14 +1191,14 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         }
 
         char ftype = (strcmp(o_sel[2], "VALID") == 0 ? 'F' : 'I');
-        t_fsentry *entry = vfs_entry_create(ftype, 
+        t_fsentry *entry = vfs_entry_create(ftype,
             fname,
-            t_modified, 
+            t_modified,
             t_modified);
 
         free(fname);
 
-        vfs_entry_add(type, entry);    
+        vfs_entry_add(type, entry);
     }
     vfs_entry_sort(type);
 
@@ -1201,16 +1209,16 @@ qry_objects_cleanup:
 
     if (schema_name != NULL)
         free(schema_name);
-    
+
     if (type_name != NULL)
-        free(type_name);    
+        free(type_name);
 
     if (temptime != NULL)
         free(temptime);
 
     if (suffix != NULL)
         free(suffix);
-    
+
     if (o_stm != NULL)
         ora_check(OCIHandleFree(o_stm, OCI_HTYPE_STMT));
 
@@ -1237,7 +1245,7 @@ ORDER BY \"SEQUENCE\"";
         logmsg(LOG_ERROR, "log_ddl_errors() - Unable to allocate memory for o_sel.");
         return EXIT_FAILURE;
     }
-    
+
     if (ora_stmt_prepare(&o_stm, query)) {
         retval = EXIT_FAILURE;
         goto log_ddl_errors_cleanup;
@@ -1262,7 +1270,7 @@ ORDER BY \"SEQUENCE\"";
         retval = EXIT_FAILURE;
         goto log_ddl_errors_cleanup;
     }
-    
+
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS)
         logddl(".. %s", o_sel);
 
@@ -1298,24 +1306,22 @@ int qry_exec_ddl(char *schema, char *object, char *ddl) {
         }
     }
     logddl(ddl_msg);
-    
+
     if (ora_stmt_prepare(&stm, ddl)) {
         return EXIT_FAILURE;
     }
 
     logmsg(LOG_DEBUG, "Executing DDL (%s)", ddl); // @todo - remove this debug messages
- 
+
     int ddlret = ora_stmt_execute(stm, 1);
     if (ddlret) {
         char ociret[50];
         retval = EXIT_FAILURE;
         switch (ddlret) {
             case OCI_SUCCESS_WITH_INFO:
-                logmsg(LOG_DEBUG, "BEFORE SUCCESS_WITH_INFO");
                 strcpy(ociret, "OCI_SUCCESS_WITH_INFO");
-                logmsg(LOG_DEBUG, "AFTER_SUCCESS_WIH");
                 break;
-    
+
             case OCI_NEED_DATA:
                 strcpy(ociret, "OCI_NEED_DATA");
                 break;
@@ -1327,19 +1333,19 @@ int qry_exec_ddl(char *schema, char *object, char *ddl) {
             case OCI_ERROR:
                 strcpy(ociret, "OCI_ERROR");
                 break;
-            
+
             case OCI_INVALID_HANDLE:
                 strcpy(ociret, "OCI_INVALID_HANDLE");
                 break;
-    
+
             case OCI_STILL_EXECUTING:
                 strcpy(ociret, "OCI_STILL_EXECUTING");
                 break;
-    
+
             case OCI_CONTINUE:
                 strcpy(ociret, "OCI_CONTINUE");
                 break;
-        
+
             default:
                 strcpy(ociret, "OCI_UKNOWN");
                 break;
@@ -1348,11 +1354,11 @@ int qry_exec_ddl(char *schema, char *object, char *ddl) {
         if (log_ddl_errors(schema, object) != EXIT_SUCCESS)
             logmsg(LOG_ERROR, "qry_exec_ddl() - Unable to log ddl errors to ddlfs.log");
         logddl(" ");
-        
+
         goto qry_exec_ddl_cleanup;
     }
     logddl(".. SUCCESS\n");
-    
+
 
 qry_exec_ddl_cleanup:
 
@@ -1361,4 +1367,3 @@ qry_exec_ddl_cleanup:
 
     return retval;
 }
-
