@@ -8,7 +8,7 @@
  * */
 
 /**
- * Determine corrent suffix (such as .sql or .java) for specified objectType.
+ * Determine correct suffix (such as .sql or .java) for specified objectType.
  * */
 int str_suffix(char **dst, const char *objectType);
 
@@ -28,18 +28,18 @@ void qry_schemas();
 int qry_types(t_fsentry *schema);
 
 /**
- * Populate g_vfs with list of actual objects (.sql files). 
+ * Populate g_vfs with list of actual objects (.sql files).
  * */
 void qry_objects(t_fsentry *schema, t_fsentry *type);
 
 /**
  * Write DDL to of object specified by schema,type,object parameters to file name fname.
- * Parameters are those available in vfs (actual filesystem path parts), not yet converted to 
+ * Parameters are those available in vfs (actual filesystem path parts), not yet converted to
  * actual database object names (str_fn2obj).
  * fname is determined by this function.
  * */
-int qry_object(const char *schema, 
-               const char *type, 
+int qry_object(const char *schema,
+               const char *type,
                const char *object,
                char **fname);
 
@@ -55,4 +55,3 @@ int qry_object_fname(const char *schema,
  * Execute DDL statement.
  * */
 int qry_exec_ddl(char *schema, char *object, char *ddl);
-

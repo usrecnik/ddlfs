@@ -755,7 +755,7 @@ int qry_object(char *schema,
         logmsg(LOG_ERROR, "qry_object_all_source() - unable to determine filename, qry_object_fname() failed.");
         return EXIT_FAILURE;
     }
-
+    
     // normalize parameters
     if (str_fn2obj(&object_schema, schema, NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object() - unable to normalize object_schema.");

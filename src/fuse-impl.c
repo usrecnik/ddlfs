@@ -181,9 +181,7 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
 
         entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
         if (entries[i] == NULL) {
-            int used_dbro = 0;
             if (g_conf.dbro == 1 && i == DEPTH_OBJECT && path[DEPTH_OBJECT] != NULL) {
-                used_dbro = 1;
                 if (qry_dbro_cache(path, entries[DEPTH_TYPE]) != EXIT_SUCCESS) {
                     qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
                 }
@@ -191,10 +189,6 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
                 qry_any(i, entries[DEPTH_SCHEMA], entries[DEPTH_TYPE]);
 
             entries[i] = vfs_entry_search((i == 0 ? g_vfs : entries[i-1]), path[i]);
-            if (used_dbro == 1 && entries[i] == NULL) {
-                logmsg(LOG_ERROR, "qry_dbro_cache failed to properly update g_vfs...");
-                vfs_dump(g_vfs, 0);
-            }
         }
         if (entries[i] == NULL) {
             // logmsg(LOG_ERROR, "File not found, depth=[%d], path_part=[%s].", i, path[i]);
@@ -207,7 +201,6 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
         if ( (g_vfs_last_schema != NULL) && (strcmp(g_vfs_last_schema->fname, entries[DEPTH_SCHEMA]->fname) != 0)) {
             logmsg(LOG_DEBUG, "Clearing VFS for [%s] in favour of [%s]", g_vfs_last_schema->fname, entries[DEPTH_SCHEMA]->fname);
             vfs_entry_free(g_vfs_last_schema, 1);
-            logmsg(LOG_DEBUG, "DEBUG: Clearing finished");
         }
     }
     g_vfs_last_schema = entries[DEPTH_SCHEMA];

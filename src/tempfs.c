@@ -18,7 +18,7 @@
 
 /**
  * determine meta file name (meta_fn) for specified cache file name (cache_fn).
- * basically, return the same string, except replace suffix with ".dfs" 
+ * basically, return the same string, except replace suffix with ".dfs"
  * */
 static int tfs_getldt_fn(const char *cache_fn, char **meta_fn) {
     int len=strlen(cache_fn);
@@ -26,7 +26,7 @@ static int tfs_getldt_fn(const char *cache_fn, char **meta_fn) {
         logmsg(LOG_ERROR, "tfs_getldt_fn - cache file name [%s] is too short.", cache_fn);
         return EXIT_FAILURE;
     }
-    
+
     *meta_fn = strdup(cache_fn);
     if (*meta_fn == NULL) {
         logmsg(LOG_ERROR, "tfs_getldt_fn - unable to allocate memory for meta_fn name based on [%s]", cache_fn);
@@ -91,13 +91,13 @@ int tfs_setldt(const char *path, time_t last_ddl_time) {
         free(meta_fn);
         return EXIT_FAILURE;
     }
-   
+
     free(meta_fn);
     return EXIT_SUCCESS;
 }
 
 int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t *mount_stamp) {
-    
+
     char *meta_fn = NULL;
     if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_getldf - unable to determine meta file for cache file [%s]", path);
@@ -119,7 +119,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
         if (ferror(fp) != 0) {
             logmsg(LOG_ERROR, "tfs_getldf - .. ERROR");
         }  else {
-            logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
+            logmsg(LOG_ERROR, "tfs_getldf - .. EOF");
         }
         fclose(fp);
         free(meta_fn);
@@ -133,7 +133,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
             if (ferror(fp) != 0) {
                 logmsg(LOG_ERROR, "tfs_getldf - .. ERROR");
             }  else {
-                logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
+                logmsg(LOG_ERROR, "tfs_getldf - .. EOF");
             }
             fclose(fp);
             free(meta_fn);
@@ -146,14 +146,14 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
             if (ferror(fp) != 0) {
                 logmsg(LOG_ERROR, "tfs_getldf - .. ERROR");
             }  else {
-                logmsg(LOG_ERROR, "tfs_getldf - .. EOF");    
-            }   
+                logmsg(LOG_ERROR, "tfs_getldf - .. EOF");
+            }
             fclose(fp);
             free(meta_fn);
             return EXIT_FAILURE;
         }
     }
-    
+
     if (fclose(fp) != 0) {
         logmsg(LOG_ERROR, "tfs_getldf - unable to close meta file [%s]", meta_fn);
         free(meta_fn);
@@ -173,14 +173,14 @@ int tfs_rmfile(const char *cache_fn) {
     }
 
     char *meta_fn = NULL;
-    
+
     if (tfs_getldt_fn(cache_fn, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_rmfile - unable to determine metafile name for [%s]", cache_fn);
         if (meta_fn != NULL)
             free(meta_fn);
         return EXIT_FAILURE;
     }
-    
+
     if (unlink(meta_fn) != 0) {
         logmsg(LOG_ERROR, "tfs_rmfile - unable to remove [%s]: %d - %s", meta_fn, errno, strerror(errno));
         retval = EXIT_FAILURE;
@@ -204,7 +204,7 @@ int tfs_quick_validate(const char *path) {
             free(meta_fn);
         return EXIT_FAILURE;
     }
-    
+
     if (access(meta_fn, F_OK) == -1) {
         logmsg(LOG_DEBUG, "tfs_quick_validate - cache file [%s] does not yet exist.", meta_fn);
         free(meta_fn);
@@ -250,7 +250,7 @@ int tfs_validate2(const char *cache_fn, time_t last_ddl_time) {
         logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is already up2date.", cache_fn);
         return EXIT_SUCCESS;
     }
-    
+
     logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is outdated.", cache_fn);
     return EXIT_FAILURE;
 }
@@ -264,15 +264,15 @@ int tfs_validate(const char *cache_fn, char *last_ddl_time, time_t *actual_time)
 static int tfs_strend(const char *haystack, const char *suffix) {
     if (strlen(haystack) <= strlen(suffix))
         return 0;
-    
+
     if (strcmp(haystack + strlen(haystack) + strlen(haystack) - strlen(suffix), suffix))
         return 1;
-    
+
     return 0;
 }
 
 int tfs_rmdir(int ignoreNoDir) {
-    
+
     // remove files in directory
     DIR *dir;
     struct dirent *ent;
@@ -281,7 +281,7 @@ int tfs_rmdir(int ignoreNoDir) {
             logmsg(LOG_ERROR, "tfs_rmdir - unable to open directory (%d): %d - %s", g_conf._temppath, errno, strerror(errno));
         return EXIT_FAILURE;
     }
-    
+
     char temppath[8192];
     while ((ent = readdir (dir)) != NULL) {
         if (strlen(g_conf._temppath) + strlen(ent->d_name) > 8190) {
@@ -291,7 +291,7 @@ int tfs_rmdir(int ignoreNoDir) {
         strcpy(temppath, g_conf._temppath);
         strcat(temppath, "/");
         strcat(temppath, ent->d_name);
- 
+
         if ( (tfs_strend(ent->d_name, ".tmp")) || (tfs_strend(ent->d_name, ".dfs")) ) {
             if (unlink(temppath) != 0) {
                 logmsg(LOG_ERROR, "tfs_rmdir - unable to delete file [%s]: %d - %s", temppath, errno, strerror(errno));
@@ -312,13 +312,13 @@ int tfs_rmdir(int ignoreNoDir) {
 }
 
 int tfs_mkdir() {
-    
+
     g_conf._temppath = calloc(2048, sizeof(char));
     if (g_conf._temppath == NULL) {
         logmsg(LOG_ERROR, "tfs_mkdir - unable to calloc memory for temppath");
         return EXIT_FAILURE;
     }
-   
+
     snprintf(g_conf._temppath, 2047, "%s/ddlfs-%s.%s.%s.%s.%d",
         g_conf.temppath,
         g_conf.database,
@@ -326,7 +326,7 @@ int tfs_mkdir() {
         g_conf.username,
         g_conf.schemas,
         g_conf.lowercase);
-    
+
     // replace "special" characters
     for (int i = strlen(g_conf.temppath)+1; i < strlen(g_conf._temppath); i++) {
         char c = g_conf._temppath[i];
@@ -344,12 +344,13 @@ int tfs_mkdir() {
 
         g_conf._temppath[i] = '_';
     }
-    
+
     // (optionally) delete existing directory
     if (g_conf.keepcache == 0)
         tfs_rmdir(1);
 
     // create or reuse directory
+    g_conf._temppath_reused = 0;
     struct stat st;
     if (stat(g_conf._temppath, &st) == -1) {
         if (errno == ENOENT) {
@@ -363,9 +364,9 @@ int tfs_mkdir() {
             return EXIT_FAILURE;
         }
     } else {
-        logmsg(LOG_DEBUG, "tfs_mkdir - reused temporary directory: [%s]", g_conf._temppath); 
+        logmsg(LOG_DEBUG, "tfs_mkdir - reused temporary directory: [%s]", g_conf._temppath);
+        g_conf._temppath_reused = 1;
     }
-     
+    
     return EXIT_SUCCESS;
 }
-
