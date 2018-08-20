@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -eu
 #
 
 if [ -n "${LD_LIBRARY_PATH:-}" ]
@@ -8,5 +8,15 @@ else
     export LD_LIBRARY_PATH="/usr/lib/ddlfs/ic"
 fi
 
-/usr/lib/ddlfs/ddlfs $@
+if [ "${DDLFS_VALGRIND:-}" == 'Y' ]
+then
+    valgrind \
+        --max-stackframe=4299840 \
+        --track-origins=yes --leak-check=full \
+        --gen-suppressions=all \
+        --suppressions=/usr/lib/ddlfs/valgrind.supp \
+        --show-leak-kinds=definite /usr/lib/ddlfs/ddlfs $@
+else
+    /usr/lib/ddlfs/ddlfs $@
+fi
 

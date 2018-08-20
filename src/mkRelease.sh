@@ -15,8 +15,10 @@ function proc_copy() {
     mkdir -p ../target/${PKG_FULL_NAME}/usr/share/man/man1
     cp wrapper.sh ../target/${PKG_FULL_NAME}/usr/bin/ddlfs
     cp ../target/ddlfs ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ddlfs
-    chmod a+x ../target/${PKG_FULL_NAME}/usr/bin/ddlfs
-    chmod a+x ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ddlfs
+    cp valgrind.supp ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/valgrind.supp
+    chmod a+x     ../target/${PKG_FULL_NAME}/usr/bin/ddlfs
+    chmod a+x     ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ddlfs
+    chmod a+r,a-w ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/valgrind.supp
     cp ../docs/ddlfs.man ../target/${PKG_FULL_NAME}/usr/share/man/man1/ddlfs.1
     unzip ${INSTANT_CLIENT_PATH}/instantclient-basic-linux.x64-*.zip -d ../target/${PKG_FULL_NAME}/usr/lib/ddlfs
     mv -v ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/instantclient_* ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic

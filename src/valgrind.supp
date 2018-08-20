@@ -1,0 +1,58 @@
+{
+   <libclntsh1>
+   Memcheck:Addr1
+   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+}
+{
+   <libclntsh2>
+   Memcheck:Addr2
+   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+}
+{
+   <libclntsh4>
+   Memcheck:Addr4
+   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+}
+{
+   <libclntsh8>
+   Memcheck:Addr8
+   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+}
+{
+   <libclntshCond1>
+   Memcheck:Cond
+   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+}
+{
+   <libclntshcoreCond1>
+   Memcheck:Cond
+   obj:/usr/lib/ddlfs/ic/libclntshcore.so.*
+}
+
+{
+   fuse_opt_add_arg:realloc
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:realloc
+   fun:fuse_opt_add_arg
+   fun:main
+}
+{
+   OCI:ora_connect
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:lfvopen
+   fun:SlfMmap
+   fun:LdiTZMapFile
+   fun:ldimtzd
+   fun:kpuiniSG
+   fun:kpummpin
+   fun:kpuenvcr
+   fun:OCIEnvCreate
+   fun:ora_connect
+   fun:main
+}
+
+
+
