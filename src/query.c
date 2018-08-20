@@ -1289,7 +1289,7 @@ log_ddl_errors_cleanup:
 int qry_exec_ddl(char *schema, char *object, char *ddl) {
     int retval = EXIT_SUCCESS;
     OCIStmt *stm = NULL;
-    char *ddl_msg = malloc(120 * sizeof(char));
+    char ddl_msg[120];
     if (ddl_msg == NULL) {
         logmsg(LOG_ERROR, "qry_exec_ddl() - unable to malloc ddl_msg");
         return EXIT_FAILURE;

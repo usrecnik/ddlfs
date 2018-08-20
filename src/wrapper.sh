@@ -14,7 +14,7 @@ then
         --max-stackframe=4299840 \
         --track-origins=yes --leak-check=full \
         --gen-suppressions=all \
-        --suppressions=/vbs/ddlfs/ddlfs-valgrind.supp \
+        --suppressions=/usr/lib/ddlfs/valgrind.supp \
         --show-leak-kinds=definite /usr/lib/ddlfs/ddlfs $@
 else
     /usr/lib/ddlfs/ddlfs $@

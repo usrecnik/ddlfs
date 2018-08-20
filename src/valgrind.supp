@@ -1,33 +1,79 @@
 {
    <libclntsh1>
    Memcheck:Addr1
-   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+   obj:/usr/lib/ddlfs/ic/*
 }
 {
    <libclntsh2>
    Memcheck:Addr2
-   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+   obj:/usr/lib/ddlfs/ic/*
 }
 {
    <libclntsh4>
    Memcheck:Addr4
-   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+   obj:/usr/lib/ddlfs/ic/*
 }
 {
    <libclntsh8>
    Memcheck:Addr8
-   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+   obj:/usr/lib/ddlfs/ic/*
 }
 {
    <libclntshCond1>
    Memcheck:Cond
-   obj:/usr/lib/ddlfs/ic/libclntsh.so.*
+   obj:/usr/lib/ddlfs/ic/*
 }
 {
    <libclntshcoreCond1>
    Memcheck:Cond
-   obj:/usr/lib/ddlfs/ic/libclntshcore.so.*
+   obj:/usr/lib/ddlfs/ic/*
 }
+{
+    <libnnzMemcheck8>
+    Memcheck:Value8
+    obj:/usr/lib/ddlfs/ic/*
+}
+{
+    <libclntshcoreLeak1>
+    Memcheck:Leak
+    match-leak-kinds: definite
+    obj:/usr/lib/ddlfs/ic/*
+}
+{
+   <OCIServerRelease1>
+   Memcheck:Param
+   write(buf)
+   fun:write
+   fun:snttwrite
+   fun:nttfpwr
+   fun:nsbasic_bsd
+   fun:nioqrc
+   fun:ttcdrv
+   fun:nioqwa
+   fun:upirtrc
+   fun:upirtr
+   fun:upiver
+   fun:kpusrel
+   fun:OCIServerRelease
+}
+{
+   <OraMemLeak1>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:slzsetevar
+   fun:lfvSetOHome
+   fun:slpmloclfv
+   fun:slpmloc
+   fun:lpmloadpkg
+   fun:lfvLoadPkg
+   fun:lfvSetShlMode
+   fun:lfvini1
+   fun:lfvinit
+   fun:kpummpin
+   fun:kpuenvcr
+}
+
 
 {
    fuse_opt_add_arg:realloc
