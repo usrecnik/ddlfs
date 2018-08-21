@@ -87,6 +87,7 @@ function test_delete() {
  test_delete "JAVA_SOURCE"   "JAVA_SOURCE1.JAVA"
  test_delete "TYPE_BODY"     "TYPE1.SQL"
  test_delete "TYPE"          "TYPE1.SQL"
+ test_delete "TRIGGER"       "TRIGGER2.SQL"
 
 # @todo - test git & hg
 
