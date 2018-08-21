@@ -1,4 +1,5 @@
 target/
 test/test_crud/mnt/
 test/test_dbro/mnt/
+test/test_dbro/cache/
 *.swp
