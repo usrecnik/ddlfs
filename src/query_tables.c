@@ -17,7 +17,7 @@ static int deflist_append(struct deflist **first, const char *def) {
         logmsg(LOG_ERROR, "deflist_append(): Unable to allocate memory for fresh");
         return EXIT_FAILURE;
     }
-    
+
     fresh->definition = calloc(strlen(def)+1, sizeof(char));
     if (fresh->definition == NULL) {
         logmsg(LOG_ERROR, "deflist_append(): Unable to allocate memory for definition");
@@ -25,14 +25,14 @@ static int deflist_append(struct deflist **first, const char *def) {
     }
 
     strcpy(fresh->definition, def);
-     
+
     fresh->next = NULL;
 
     if (*first == NULL) {
         *first = fresh;
         return EXIT_SUCCESS;
     }
-    
+
     struct deflist *temp = *first;
     while (temp->next != NULL)
         temp = temp->next;
@@ -44,7 +44,7 @@ static int deflist_append(struct deflist **first, const char *def) {
 static void deflist_free(struct deflist *curr) {
     if (curr == NULL)
         return;
-    
+
     while (curr != NULL) {
         free(curr->definition);
         struct deflist *temp = curr;
@@ -54,10 +54,10 @@ static void deflist_free(struct deflist *curr) {
 }
 
 static int tab_all_tables(const char *schema, const char *table, struct tabledef *def) {
-    const char *query = 
+    const char *query =
 "select t.\"TEMPORARY\"\
  from all_tables t where t.owner=:bind_owner and t.table_name=:bind_name";
-     
+
     int retval = EXIT_SUCCESS;
 
     ORA_STMT_PREPARE(tab_all_tables);
@@ -70,7 +70,7 @@ static int tab_all_tables(const char *schema, const char *table, struct tabledef
             def->exists = 'N';
             def->temporary = 'N';
         } else {
-            def->exists = 'Y';    
+            def->exists = 'Y';
             def->temporary = (strcmp(ORA_NVL(temporary, "N"), "Y") == 0) ? 'Y' : 'N';
         }
     } else {
@@ -81,17 +81,17 @@ static int tab_all_tables(const char *schema, const char *table, struct tabledef
 tab_all_tables_cleanup:
     ORA_STMT_FREE;
     return retval;
-} 
+}
 
 static int tab_all_tab_columns(const char *schema, const char *table, struct tabledef *def) {
-    const char *query = 
+    const char *query =
 "select column_name, data_type, data_length, data_precision, data_scale, nullable,\
  default_length, data_default, char_length, char_used\
  from all_tab_columns where owner=:bind_owner and table_name=:bind_name\
  order by column_id";
 
     int retval = EXIT_SUCCESS;
-        
+
     ORA_STMT_PREPARE(tab_all_tab_columns);
     ORA_STMT_DEFINE_STR  (tab_all_tab_columns, 1,  column_name, 129);
     ORA_STMT_DEFINE_STR_I(tab_all_tab_columns, 2,  data_type, 129);
@@ -104,11 +104,11 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
     ORA_STMT_DEFINE_INT_I(tab_all_tab_columns, 9,  char_length);
     ORA_STMT_DEFINE_STR_I(tab_all_tab_columns, 10, char_used, 2);
     ORA_STMT_BIND_STR(tab_all_tab_columns, 1, schema);
-    ORA_STMT_BIND_STR(tab_all_tab_columns, 2, table);    
+    ORA_STMT_BIND_STR(tab_all_tab_columns, 2, table);
     ORA_STMT_EXECUTE(tab_all_tab_columns, 0);
 
     char definition[4096];                // buffer (on stack) in which to build column representation
-    char scale[100]; 
+    char scale[100];
     struct deflist *col_start = NULL;     // always points to first column if there is at least one column present
     struct deflist *col_temp = NULL;      // temporary, points to any columns
     struct deflist *col_curr = NULL;      // for loops, used as pointer to current element
@@ -127,7 +127,7 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
         logmsg(LOG_DEBUG, ".. char_length=[%d]", (i_char_length == 0 ? o_char_length : -1));
         logmsg(LOG_DEBUG, ".. char_used=[%s]", (i_char_used == 0 ? o_char_used : "NULL"));
         */
-        
+
         // data type
         if (strstr(ORA_NVL(data_type, "X"), "CHAR") != NULL) {
             if (i_char_used != 0 && i_char_length != 0 && o_char_used[0] == 'C')
@@ -137,12 +137,12 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
         } else {
             if (i_data_precision != 0 && i_data_scale != 0)
                 scale[0] = '\0';
-            else if (i_data_precision == 0 && i_data_scale != 0) 
+            else if (i_data_precision == 0 && i_data_scale != 0)
                 snprintf(scale, 99, "(%d)", o_data_precision);
             else if (i_data_precision == 0 && i_data_scale == 0)
                 snprintf(scale, 99, "(%d,%d)", o_data_precision, o_data_scale);
             else
-                scale[0] = '\0'; // this probably should never happen               
+                scale[0] = '\0'; // this probably should never happen
         }
 
         // default
@@ -158,12 +158,12 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
             logmsg(LOG_ERROR, "tab_all_tab_columns() - Unable to allocate memory for column definition.");
             goto tab_all_tab_columns_cleanup;
         }
-        
+
         col_temp->definition = calloc(strlen(definition)+1, sizeof(char));
         col_temp->next = NULL;
-        
+
         strcpy(col_temp->definition, definition);
-        
+
         // append created column to linked list
         if (col_start == NULL)
             col_start = col_temp;
@@ -171,18 +171,18 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
             col_curr = col_start;
             while (col_curr->next != NULL)
                 col_curr = col_curr->next;
-            col_curr->next = col_temp;            
-        } 
+            col_curr->next = col_temp;
+        }
     }
     def->columns = col_start;
- 
+
 tab_all_tab_columns_cleanup:
-    ORA_STMT_FREE; 
+    ORA_STMT_FREE;
     return retval;
 }
 
 static int tab_all_constraints(const char *schema, const char *table, struct tabledef *def) {
-    const char *query_template = 
+    const char *query_template =
 "select * from (\
  select ac.constraint_name, ac.constraint_type, ac.index_owner, ac.index_name, ac.r_owner, rc.table_name as r_table_name,\
  %s\
@@ -199,11 +199,11 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
  where owner=:bind_owner and table_name=:bind_name and generated='USER NAME' and constraint_type='C')\
  order by decode(constraint_type, 'P', 1, 'U', 2, 'R', 3, 'C', 4, 5), constraint_name";
 
-    const char *listagg_10 = 
+    const char *listagg_10 =
 "rtrim(xmlagg(xmlelement(e, cc.column_name, ',') order by cc.position).extract('//text()').getclobval(), ',') as colstr,\
  rtrim(xmlagg(xmlelement(e, rc.column_name, ',') order by rc.position).extract('//text()').getclobval(), ',') as r_colstr,";
 
-    const char *listagg_11 = 
+    const char *listagg_11 =
 "listagg('\"' || replace(cc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by cc.position) as colstr,\
  listagg('\"' || replace(rc.column_name, '\"', '\"\"') || '\"', ', ') within group (order by rc.position) as r_colstr,";
 
@@ -212,7 +212,7 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
 
     int retval = EXIT_SUCCESS;
     def->constraints = NULL;
-     
+
     ORA_STMT_PREPARE(tab_all_constraints);
     ORA_STMT_DEFINE_STR  (tab_all_constraints, 1, constraint_name,  129);
     ORA_STMT_DEFINE_STR_I(tab_all_constraints, 2, constraint_type,  2);
@@ -226,9 +226,9 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
     ORA_STMT_BIND_STR(tab_all_constraints, 1, schema);
     ORA_STMT_BIND_STR(tab_all_constraints, 2, table);
     ORA_STMT_BIND_STR(tab_all_constraints, 3, schema);
-    ORA_STMT_BIND_STR(tab_all_constraints, 4, table); 
+    ORA_STMT_BIND_STR(tab_all_constraints, 4, table);
     ORA_STMT_EXECUTE(tab_all_constraints, 0);
-    
+
     char tmpstr[8192];
     char tmpstr_part[500];
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
@@ -253,14 +253,14 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
             case 'C': strcpy(tmpstr_part, "CHECK");       break;
             default : strcpy(tmpstr_part, "UNKNOWN");     break;
         }
-        
+
         snprintf(tmpstr, 8192, "ALTER TABLE \"%s\".\"%s\" ADD CONSTRAINT \"%s\" %s",
             schema, table, o_constraint_name, tmpstr_part
         );
-        
+
         if (i_index_owner == 0 && i_index_name == 0)
             snprintf(tmpstr_part, 500, " USING INDEX \"%s\".\"%s\"", o_index_owner, o_index_name);
-        else if (i_index_owner !=0 && i_index_name == 0) 
+        else if (i_index_owner !=0 && i_index_name == 0)
             snprintf(tmpstr_part, 500, " USING INDEX \"%s\"", o_index_name);
         else
             tmpstr_part[0] = '\0';
@@ -276,29 +276,29 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
                     (i_ref_table == 0 ? o_ref_table : "???"),
                     (i_ref_colstr == 0 ? o_ref_colstr : "???"));
                 break;
-            
+
             case 'C':
                 snprintf(tmpstr_part, 500, " (%s)", (i_search_condition == 0 ? o_search_condition : "???"));
                 break;
         }
         strcat(tmpstr, tmpstr_part);
         strcat(tmpstr, ";\n");
-        
+
         if (deflist_append(&def->constraints, tmpstr) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "tab_all_constraints(): failed to assemble list of constraints.");
             retval = EXIT_FAILURE;
             goto tab_all_constraints_cleanup;
         }
     }
-    
+
 tab_all_constraints_cleanup:
     ORA_STMT_FREE;
-    return retval; 
+    return retval;
 }
 
 int tab_all_indexes(const char *schema, const char *table, struct tabledef *def) {
 
-    const char *query = 
+    const char *query =
 "select ai.owner, ai.index_name, ai.index_type, ai.uniqueness, ai.compression, ai.prefix_length,\
  ic.column_name, ic.descend as column_descend,\
  ie.column_expression as expression_string\
@@ -308,9 +308,9 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
  and ie.index_name = ai.index_name and ie.column_position=ic.column_position\
  where ai.table_owner=:bind_owner and ai.table_name=:bind_name\
  order by ai.owner, ai.index_name, ic.column_position";
-    
+
     int retval = EXIT_SUCCESS;
-    
+
     def->indexes = NULL;
 
     ORA_STMT_PREPARE(tab_all_indexes);
@@ -323,14 +323,14 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
     ORA_STMT_DEFINE_STR_I(tab_all_indexes, 7, column_name,       129);
     ORA_STMT_DEFINE_STR_I(tab_all_indexes, 8, column_descend,    15);
     ORA_STMT_DEFINE_STR_I(tab_all_indexes, 9, column_expression, 4000);
-    ORA_STMT_BIND_STR(tab_all_indexes, 1, schema); 
-    ORA_STMT_BIND_STR(tab_all_indexes, 2, table);    
+    ORA_STMT_BIND_STR(tab_all_indexes, 1, schema);
+    ORA_STMT_BIND_STR(tab_all_indexes, 2, table);
     ORA_STMT_EXECUTE(tab_all_indexes, 0);
-    
+
     char tmp_prev_index[1024] = "";
     char tmp_next_index[1024] = "";
-    char tmp[8192];
-    char tmp_buff[500];
+    char tmp[8192] = "";
+    char tmp_buff[500] = "";
 
     int tmp_prev_compress = -2;
     while (ORA_STMT_FETCH) {
@@ -349,11 +349,11 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
         */
         snprintf(tmp_next_index, 1024, "'%s'.'%s'", ORA_VAL(index_owner), ORA_VAL(index_name));
         if (strcmp(tmp_prev_index, tmp_next_index) != 0) {
-            if (strlen(tmp_prev_index) != 0) {                 
+            if (strlen(tmp_prev_index) != 0) {
                 if (tmp_prev_compress < 0)
                     strcat(tmp, ");\n");
                 else {
-                    snprintf(tmp_buff, 500, ") COMPRESS %d;\n", tmp_prev_compress); 
+                    snprintf(tmp_buff, 500, ") COMPRESS %d;\n", tmp_prev_compress);
                     strcat(tmp, tmp_buff);
                 }
 
@@ -363,51 +363,51 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
                     goto tab_all_indexes_cleanup;
                 }
             }
-    
+
             snprintf(tmp_prev_index, 1024, "'%s'.'%s'", ORA_VAL(index_owner), ORA_VAL(index_name));
-            
+
             if (strcmp(ORA_NVL(index_type, "X"), "BITMAP") == 0)
                 strncpy(tmp_buff, " BITMAP ", 20);
             else if (strcmp(ORA_NVL(index_unique, "X"), "UNIQUE") == 0)
                 strncpy(tmp_buff, " UNIQUE ", 20);
             else
                 strncpy(tmp_buff, " ", 20);
-            
+
             snprintf(tmp, 8192, "CREATE%sINDEX \"%s\".\"%s\" ON \"%s\".\"%s\"(",
                 tmp_buff, ORA_VAL(index_owner), ORA_VAL(index_name), schema, table);
 
             tmp_prev_compress = -1;
             if (strcmp(ORA_NVL(index_compress, "XX"), "ENABLED") == 0)
                 tmp_prev_compress = ORA_NVL(index_prefix, -1);
-            
+
         } else {
             strcat(tmp, ", ");
         }
-    
+
         if (strcmp(ORA_NVL(column_expression, "_IS_NULL_"), "_IS_NULL_") == 0)
             snprintf(tmp_buff, 500, "\"%s\"", ORA_NVL(column_name, "???"));
         else
             snprintf(tmp_buff, 500, "%s", ORA_NVL(column_expression, "???"));
         strcat(tmp_buff, (strcmp(ORA_NVL(column_descend, "?"), "DESC") == 0 ? " DESC" : ""));
-        strcat(tmp, tmp_buff); 
+        strcat(tmp, tmp_buff);
     }
 
     if (tmp_prev_compress != -2) {
         if (tmp_prev_compress == -1)
             strcat(tmp, ");\n");
         else {
-            snprintf(tmp_buff, 500, ") COMPRESS %d;\n", tmp_prev_compress); 
+            snprintf(tmp_buff, 500, ") COMPRESS %d;\n", tmp_prev_compress);
             strcat(tmp, tmp_buff);
         }
     }
-    
+
     if (deflist_append(&def->indexes, tmp) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tab_all_indexes(): failed to assemble list of indexes.");
         retval = EXIT_FAILURE;
         goto tab_all_indexes_cleanup;
     }
 
-     
+
 tab_all_indexes_cleanup:
     ORA_STMT_FREE;
     return retval;
@@ -416,7 +416,7 @@ tab_all_indexes_cleanup:
 int qry_object_all_tables(const char *schema,
                           const char *table,
                           const char *fname) {
-    
+
     int retval = EXIT_SUCCESS;
     FILE *fp = NULL;
     char temp[4096];
@@ -432,7 +432,7 @@ int qry_object_all_tables(const char *schema,
         logmsg(LOG_ERROR, "qry_object_all_tables(): unable to allocate memory for tabledef.");
         return EXIT_FAILURE;
     }
-     
+
     if (tab_all_tables(schema, table, def) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): tab_all_tables() failed.");
         retval = EXIT_FAILURE;
@@ -450,13 +450,13 @@ int qry_object_all_tables(const char *schema,
         retval = EXIT_FAILURE;
         goto qry_object_all_tables_cleanup;
     }
-    
+
     if (tab_all_constraints(schema, table, def) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): tab_all_constraints() failed.");
         retval = EXIT_FAILURE;
         goto qry_object_all_tables_cleanup;
     }
-    
+
     fp = fopen(fname, "w");
     if (fp == NULL) {
         logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to open [%s]: %d %n", fname, errno, strerror(errno));
@@ -500,7 +500,7 @@ int qry_object_all_tables(const char *schema,
 
 
 qry_object_all_tables_cleanup:
-    if (fp != NULL && fclose(fp) != 0) 
+    if (fp != NULL && fclose(fp) != 0)
         logmsg(LOG_ERROR, "qry_object_all_tables(): Unable to close [%s]: %d %n", fname, errno, strerror(errno));
 
     if (def != NULL) {
@@ -518,4 +518,3 @@ qry_object_all_tables_cleanup:
     }
     return retval;
 }
-

@@ -5,4 +5,7 @@ test/test_dbro/cache/
 test/test_hg/mnt/
 test/test_hg/cache/
 test/test_hg/.*
+test/test_git/mnt/
+test/test_git/cache/
+test/test_git/.*
 *.swp
