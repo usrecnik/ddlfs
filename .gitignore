@@ -2,4 +2,7 @@ target/
 test/test_crud/mnt/
 test/test_dbro/mnt/
 test/test_dbro/cache/
+test/test_hg/mnt/
+test/test_hg/cache/
+test/test_hg/.*
 *.swp
