@@ -14,7 +14,6 @@ struct s_global_config {
     char *pdb;
     int   dbro;
     int   keepcache;
-    int   lowercase;
     int   filesize;
     char *loglevel;
 

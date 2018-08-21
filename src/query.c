@@ -20,15 +20,6 @@
 
 #define LOB_BUFFER_SIZE 8196
 
-static void str_lower(char *str) {
-    for (int i = 0; str[i]; i++)
-        str[i] = tolower(str[i]);
-}
-
-static void str_upper(char *str) {
-    for (int i = 0; str[i]; i++)
-        str[i] = toupper(str[i]);
-}
 
 static int str_append(char **dst, char *src) {
     int len = (*dst == NULL ? strlen(src) : strlen(*dst) + strlen(src));
@@ -59,8 +50,6 @@ int str_suffix(char **dst, const char *objectType) {
             free(type);
         return EXIT_FAILURE;
     }
-
-    str_upper(type);
 
     if (strcmp(type, "JAVA_SOURCE") == 0)
         strcpy(suffix, ".JAVA");
@@ -99,8 +88,6 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
         logmsg(LOG_ERROR, "str_fn2obj() - Unable to malloc for dst string.");
         return EXIT_FAILURE;
     }
-    if (g_conf.lowercase)
-        str_upper(*dst);
 
     if (objectType != NULL) {
         char *expectedSuffix = NULL;
@@ -755,7 +742,7 @@ int qry_object(char *schema,
         logmsg(LOG_ERROR, "qry_object_all_source() - unable to determine filename, qry_object_fname() failed.");
         return EXIT_FAILURE;
     }
-    
+
     // normalize parameters
     if (str_fn2obj(&object_schema, schema, NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object() - unable to normalize object_schema.");
@@ -781,7 +768,6 @@ int qry_object(char *schema,
         return EXIT_FAILURE;
     }
 
-    str_upper(object_type);
     if (str_fs2oratype(&object_type) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object() - unable to convert fs type to ora type.");
         if (object_schema != NULL) free(object_schema);
@@ -917,9 +903,6 @@ int qry_schemas() {
     // vfs_entry_free(g_vfs, 1);
 
     while (ORA_STMT_FETCH) {
-        if (g_conf.lowercase)
-            str_lower((char*) o_username);
-
         // convert created date
         struct tm *temptime = malloc(sizeof(struct tm));
         if (temptime == NULL) {
@@ -986,50 +969,22 @@ int qry_types(t_fsentry *schema) {
     vfs_entry_free(schema, 1);
 
     char *types[] = {
-        "function",
-        "java_source",
-        "package_body",
-        "package_spec",
-        "procedure",
-        "table",
-        "trigger",
-        "type",
-        "type_body",
-        "view",
+        "FUNCTION",
+        "JAVA_SOURCE",
+        "PACKAGE_BODY",
+        "PACKAGE_SPEC",
+        "PROCEDURE",
+        "TABLE",
+        "TRIGGER",
+        "TYPE",
+        "TYPE_BODY",
+        "VIEW",
         NULL
     };
 
-    char *fixed_date_str = "1990-01-01 01:01:01";
-    struct tm *temptime = malloc(sizeof(struct tm));
-    if (temptime == NULL) {
-        logmsg(LOG_ERROR, "qry_types(): unable to allocate memory for temptime");
-        return EXIT_FAILURE;
-    }
-    memset(temptime, 0, sizeof(struct tm));
-    char* xx = strptime(fixed_date_str, "%Y-%m-%d %H:%M:%S", temptime);
-    if (xx == NULL || *xx != '\0') {
-        logmsg(LOG_ERROR, "qry_types(): unable to parse fixed date=[%s]", fixed_date_str);
-        free(temptime);
-        return EXIT_FAILURE;
-    }
-    time_t fixed_date = timegm(temptime);
-    free(temptime);
-
-    for (int i = 0; types[i] != NULL; i++) {
-        char *type = strdup(types[i]);
-        if (type == NULL) {
-            logmsg(LOG_ERROR, "qry_types() - unable to strdup type");
-            return EXIT_FAILURE;
-        }
-
-        if (g_conf.lowercase)
-            str_lower(type);
-        else
-            str_upper(type);
-
-        vfs_entry_add(schema, vfs_entry_create('D', type, fixed_date, fixed_date));
-        free(type);
-    }
+    time_t fixed_date = utl_str2time("1990-01-01 01:01:01");
+    for (int i = 0; types[i] != NULL; i++)
+        vfs_entry_add(schema, vfs_entry_create('D', types[i], fixed_date, fixed_date));
 
     vfs_entry_sort(schema);
 
@@ -1077,10 +1032,6 @@ from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type and ge
             free(schema_name);
         return EXIT_FAILURE;
     }
-    if (g_conf.lowercase) {
-        str_upper(schema_name);
-        str_upper(type_name);
-    }
 
     if ((strcmp(schema_name, "SYS") == 0) && (strcmp(type_name, "TYPE") == 0)) {
         strcat(query, " and exists (\
@@ -1096,9 +1047,6 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
             free(schema_name);
         return EXIT_FAILURE;
     }
-
-    if (g_conf.lowercase)
-        str_lower(suffix);
 
     if (str_fs2oratype(&type_name) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_objects() - unable to convert fs type to ora type.");
@@ -1174,9 +1122,6 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         }
         strcpy(fname, (char*) o_sel[0]);
         strcat(fname, suffix);
-
-        if (g_conf.lowercase)
-            str_lower(fname);
 
         // https://stackoverflow.com/questions/9847288/is-it-possible-to-use-in-a-filename
         char *tmp = fname;
