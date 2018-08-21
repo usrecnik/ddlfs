@@ -20,7 +20,7 @@ function test_create() {
     local readonly l_dbf="$2"
     local readonly l_rpf="$3"
 
-    echo "creating and verifying $l_type/$l_dbf"
+    echo "creating $l_type/$l_dbf"
     > "$CFG_MOUNT_POINT/DDLFS_TESTCASE/$l_type/$l_dbf"
     proc_compare "repository/$l_rpf" "$CFG_MOUNT_POINT/DDLFS_TESTCASE/$l_type/$l_dbf"
 }
@@ -30,9 +30,30 @@ function test_copy() {
     local readonly l_dbf="$2"
     local readonly l_rpf="$3"
 
-    echo "copying and verifying $l_type/$l_dbf"
+    echo "copying $l_type/$l_dbf"
     cp repository/$l_rpf "$CFG_MOUNT_POINT/DDLFS_TESTCASE/$l_type/$l_dbf"
     proc_compare "repository/$l_rpf" "$CFG_MOUNT_POINT/DDLFS_TESTCASE/$l_type/$l_dbf"
+}
+
+function test_delete() {
+    local readonly l_type="$1"
+    local readonly l_dbf="$2"
+
+    echo "deleting $l_type/$l_dbf";
+    rm "$CFG_MOUNT_POINT/DDLFS_TESTCASE/$l_type/$l_dbf"
+    if [ -f "$CFG_MOUNT_POINT/DDLFS_TESTCASE/$l_type/$l_dbf" ]
+    then
+        echo "error: deleted file still exists...";
+    fi
+    set +e
+    ls "$CFG_MOUNT_POINT/" &> /dev/null
+    stat "$CFG_MOUNT_POINT/ANONYMOUS/VIEW/NOT_EXISTS.SQL" &> /dev/null
+    set -e
+
+    if [ -f "$CFG_MOUNT_POINT/DDLFS_TESTCASE/$l_type/$l_dbf" ]
+    then
+        echo "error: deleted file re-appeared...";
+    fi
 }
 
 # Test creating "empty" files:
@@ -57,7 +78,16 @@ function test_copy() {
  test_copy "TYPE_BODY"     "TYPE2.SQL"         "TYPE_BODY2.SQL"
 #test_copy "TRIGGER"       "TRIGGER2.SQL"      "TRIGGER2.SQL"
 
-# @todo - test deleting files...
+# Test deleting existing files
+ test_delete "PACKAGE_BODY"  "PACKAGE1.SQL"
+ test_delete "PACKAGE_SPEC"  "PACKAGE1.SQL"
+ test_delete "FUNCTION"      "FUNCTION1.SQL"
+ test_delete "PROCEDURE"     "PROCEDURE1.SQL"
+ test_delete "VIEW"          "VIEW1.SQL"
+ test_delete "JAVA_SOURCE"   "JAVA_SOURCE1.JAVA"
+ test_delete "TYPE_BODY"     "TYPE1.SQL"
+ test_delete "TYPE"          "TYPE1.SQL"
+
 # @todo - test git & hg
 
 #fusermount -u "$CFG_MOUNT_POINT"

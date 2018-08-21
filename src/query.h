@@ -44,7 +44,7 @@ int qry_object(const char *schema,
                char **fname);
 
 /**
- * Assamble temporary filename based on schema, type and object.
+ * Assemble temporary filename based on schema, type and object.
  * */
 int qry_object_fname(const char *schema,
 					 const char *type,

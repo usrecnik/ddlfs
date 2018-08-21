@@ -694,59 +694,78 @@ int fs_unlink(const char *path) {
 
 
     if (depth != 3) {
-        logmsg(LOG_ERROR, "Cannot unlink objects which are not at level 3");
+        logmsg(LOG_ERROR, "fs_unlink() - Cannot unlink objects which are not at level 3");
         fs_path_free(part);
         return -EINVAL;
     }
     if (str_fn2obj(&object_type, part[DEPTH_TYPE], NULL) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+        logmsg(LOG_ERROR, "fs_unlink() - unable to convert object to file name");
         fs_path_free(part);
         return -ENOMEM;
     }
     if (str_fn2obj(&object_name, part[DEPTH_OBJECT], part[DEPTH_TYPE]) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
+        logmsg(LOG_ERROR, "fs_unlink() - unable to convert object to file name");
         fs_path_free(part);
         return -ENOMEM;
     }
     if (str_fn2obj(&object_schema, part[DEPTH_SCHEMA], NULL) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "fs_create() - unable to convert schema to file name");
+        logmsg(LOG_ERROR, "fs_unlink() - unable to convert schema to file name");
         fs_path_free(part);
         return -ENOMEM;
     }
 
     if (strcmp(object_type, "PROCEDURE") == 0)
-        snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"",    object_schema, object_name);
     else if (strcmp(object_type, "FUNCTION") == 0)
-        snprintf(drop_ddl, 1023, "DROP FUNCTION \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP FUNCTION \"%s\".\"%s\"",     object_schema, object_name);
     else if (strcmp(object_type, "VIEW") == 0)
-        snprintf(drop_ddl, 1023, "DROP VIEW \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP VIEW \"%s\".\"%s\"",         object_schema, object_name);
     else if (strcmp(object_type, "TYPE") == 0)
-        snprintf(drop_ddl, 1023, "DROP TYPE \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP TYPE \"%s\".\"%s\"",         object_schema, object_name);
     else if (strcmp(object_type, "TYPE_BODY") == 0)
-        snprintf(drop_ddl, 1023, "DROP TYPE BODY \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP TYPE BODY \"%s\".\"%s\"",    object_schema, object_name);
     else if (strcmp(object_type, "PACKAGE_SPEC") == 0)
-        snprintf(drop_ddl, 1023, "DROP PACKAGE \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP PACKAGE \"%s\".\"%s\"",      object_schema, object_name);
     else if (strcmp(object_type, "PACKAGE_BODY") == 0)
-        snprintf(drop_ddl, 1023, "DROP PACKAGE BODY \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP PACKAGE BODY \"%s\".\"%s\"", object_schema, object_name);
     else if (strcmp(object_type, "JAVA_SOURCE") == 0)
-        snprintf(drop_ddl, 1023, "DROP JAVA SOURCE \"%s\".\"%s\"",
-            object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP JAVA SOURCE \"%s\".\"%s\"",  object_schema, object_name);
+    else if (strcmp(object_type, "TRIGGER") == 0)
+        snprintf(drop_ddl, 1023, "DROP TRIGGER \"%s\".\"%s\"",      object_schema, object_name);
     else {
-        logmsg(LOG_ERROR, "Cannot drop object %s.%s, operation not (yet?) supported.",
+        logmsg(LOG_ERROR, "fs_unlink() - Cannot drop object %s.%s, operation not (yet?) supported.",
             part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
         fs_path_free(part);
         return -EINVAL;
     }
-    fs_path_free(part);
 
     qry_exec_ddl(object_schema, object_name, drop_ddl);
+
+    // delete cache file
+    char *cache_fn = NULL;
+    logmsg(LOG_DEBUG, "DBG0: qry_object_fname(%s, %s, %s)", part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT]);
+    if (qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &cache_fn) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "fs_unlink() - unable to determin cache filename for [%s] [%s].[%s]", part[DEPTH_TYPE], part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
+        return -EINVAL;
+    }
+    if (access(cache_fn, F_OK) == 0)
+        tfs_rmfile(cache_fn);    
+    logmsg(LOG_DEBUG, "DBG1: removed cache_fn=[%s]", cache_fn);
+
+    // remove vfs vfs_etry
+    t_fsentry *vfs_schema = vfs_entry_search(g_vfs, part[DEPTH_SCHEMA]);
+    if (vfs_schema != NULL) {
+        t_fsentry *vfs_type = vfs_entry_search(vfs_schema, part[DEPTH_TYPE]);
+        if (vfs_type != NULL) {
+            vfs_entry_free(vfs_type, 1);
+            logmsg(LOG_DEBUG, "DBG2: cleared vfs for [%s]/[%s]", vfs_schema->fname, vfs_type->fname);
+        }
+    }
+
+    // cleanup
+    fs_path_free(part);
+    if (cache_fn != NULL)
+        free(cache_fn);
 
     if (object_type != NULL)
         free(object_type);
