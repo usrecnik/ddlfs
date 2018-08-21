@@ -1,3 +1,4 @@
 target/
-test/mnt/
+test/test_crud/mnt/
+test/test_dbro/mnt/
 *.swp

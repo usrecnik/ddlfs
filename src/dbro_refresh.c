@@ -1,7 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
+#include <string.h>
+
+#include <unistd.h>
+#include <fcntl.h>           /* Definition of AT_* constants */
 
 #include "logging.h"
+#include "config.h"
 #include "oracle.h"
 #include "tempfs.h"
 #include "util.h"
@@ -53,6 +61,49 @@ static int dbr_refresh_object(const char *schema,
     return EXIT_SUCCESS;
 }
 
+static int dbr_delete_obsolete() {
+    char cache_fn[4096];
+    DIR *dir = opendir(g_conf._temppath);
+
+    if (dir == NULL) {
+        logmsg(LOG_ERROR, "dbr_delete_obsolete() - unable to open directory: %d - %s", errno, strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+    struct dirent *dir_entry = NULL;
+    while ((dir_entry = readdir(dir)) != NULL) {
+        if (dir_entry->d_type != DT_REG)
+            continue;
+
+        int name_len = strlen(dir_entry->d_name);
+        if (name_len < 5)
+            continue;
+
+        char *suffix = dir_entry->d_name + name_len - 4;
+        if (strcmp(suffix, ".tmp") != 0)
+            continue;
+
+        snprintf(cache_fn, 4095, "%s/%s", g_conf._temppath, dir_entry->d_name);
+
+        time_t last_ddl_time = 0;
+        time_t mount_stamp = 0;
+        pid_t mount_pid = 0;
+        if (tfs_getldt(cache_fn, &last_ddl_time, &mount_pid, &mount_stamp) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "dbr_delete_obsolete() - tfs_getldt returned error");
+            closedir(dir);
+            return EXIT_FAILURE;
+        }
+
+        if ((mount_pid != g_conf._mount_pid) || (mount_stamp != g_conf._mount_stamp)) {
+            tfs_rmfile(cache_fn);
+            logmsg(LOG_DEBUG, "dbr_delete_obsolete() - removed obsolete cache file [%s]", cache_fn);
+        }
+    }
+    closedir(dir);
+    
+    return EXIT_SUCCESS;
+}
+
 int dbr_refresh_cache() {
     int retval = EXIT_SUCCESS;
     const char *query =
@@ -86,6 +137,8 @@ int dbr_refresh_cache() {
             ORA_NVL(object, "_UNKNOWN_OBJECT_"),
             utl_str2time(ORA_NVL(last_ddl_time, "1990-01-01 03:00:01")));
     }
+
+    dbr_delete_obsolete();
 
 dbr_refresh_state_cleanup:
     ORA_STMT_FREE;

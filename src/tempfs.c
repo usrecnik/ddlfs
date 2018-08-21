@@ -108,7 +108,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
 
     FILE *fp = fopen(meta_fn, "r");
     if (fp == NULL) {
-        logmsg(LOG_ERROR, "tfs_getldf - unable to opem meta file [%s]: %d - %s", meta_fn, errno, strerror(errno));
+        logmsg(LOG_ERROR, "tfs_getldf - unable to open meta file [%s]: %d - %s", meta_fn, errno, strerror(errno));
         free(meta_fn);
         return EXIT_FAILURE;
     }
@@ -168,7 +168,7 @@ int tfs_rmfile(const char *cache_fn) {
 
     int retval = EXIT_SUCCESS;
     if (unlink(cache_fn) != 0) {
-        logmsg(LOG_ERROR, "tfs_rmfile - unable to remove [%s]: %d - %s", cache_fn, errno, strerror(errno));
+        logmsg(LOG_ERROR, "tfs_rmfile - unable to remove cache file [%s]: %d - %s", cache_fn, errno, strerror(errno));
         retval = EXIT_FAILURE;
     }
 
@@ -182,7 +182,7 @@ int tfs_rmfile(const char *cache_fn) {
     }
 
     if (unlink(meta_fn) != 0) {
-        logmsg(LOG_ERROR, "tfs_rmfile - unable to remove [%s]: %d - %s", meta_fn, errno, strerror(errno));
+        logmsg(LOG_ERROR, "tfs_rmfile - unable to remove meta file [%s]: %d - %s", meta_fn, errno, strerror(errno));
         retval = EXIT_FAILURE;
     }
 
@@ -367,6 +367,6 @@ int tfs_mkdir() {
         logmsg(LOG_DEBUG, "tfs_mkdir - reused temporary directory: [%s]", g_conf._temppath);
         g_conf._temppath_reused = 1;
     }
-    
+
     return EXIT_SUCCESS;
 }
