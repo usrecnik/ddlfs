@@ -1,9 +1,7 @@
 #!/bin/bash -eu
 #
 
-export CFG_USERNAME="DDLFS_TESTCASE"
-export CFG_PASSWORD="testcase"
-export CFG_MOUNT_POINT="./mnt/"
+source cfg.sh
 
 if [ ! -d "$CFG_MOUNT_POINT" ]
 then
@@ -15,6 +13,6 @@ username=$CFG_USERNAME,\
 password=$CFG_PASSWORD,\
 schemas=%,\
 loglevel=DEBUG,\
-database=dbhost:1521/ddlfs.abakus.si \
+database=$CFG_DATABASE \
 "$CFG_MOUNT_POINT" \
 # &> testcase.log &
