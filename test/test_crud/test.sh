@@ -84,8 +84,12 @@ function test_vanish() {
         TYPE_BODY)
             l_ora_type="TYPE BODY"
             ;;
-    esac
 
+        MATERIALIZED_VIEW)
+            l_ora_type="MATERIALIZED VIEW"
+            ;;
+    esac
+    
     local l_db_object="${l_dbf%.*}"
     # echo "debug: drop $l_ora_type \"$CFG_USERNAME\".\"$l_db_object\";"
     sqlplus -S $CFG_USERNAME/$CFG_PASSWORD@$CFG_DATABASE &> /dev/null << eof
@@ -111,7 +115,7 @@ eof
  test_create "JAVA_SOURCE"   "JAVA_SOURCE1.JAVA" "JAVA_SOURCE1.JAVA"
  test_create "TYPE"          "TYPE1.SQL"         "TYPE1.SQL"
  test_create "TYPE_BODY"     "TYPE1.SQL"         "TYPE_BODY1.SQL"
-#test_create "TRIGGER"       "TRIGGER1.SQL"      "TRIGGER1.SQL"
+# trigger, materialized_view, table: not supported
 
 # Test copying new files:
  test_copy "PACKAGE_SPEC"  "PACKAGE2.SQL"      "PACKAGE_SPEC2.SQL"
@@ -122,29 +126,33 @@ eof
  test_copy "JAVA_SOURCE"   "JAVA_SOURCE2.JAVA" "JAVA_SOURCE2.JAVA"
  test_copy "TYPE"          "TYPE2.SQL"         "TYPE2.SQL"
  test_copy "TYPE_BODY"     "TYPE2.SQL"         "TYPE_BODY2.SQL"
-#test_copy "TRIGGER"       "TRIGGER2.SQL"      "TRIGGER2.SQL"
+# trigger, materialized_view, table: not supported
 
 # Test deleting existing files
- test_delete "PACKAGE_BODY"  "PACKAGE1.SQL"
- test_delete "PACKAGE_SPEC"  "PACKAGE1.SQL"
- test_delete "FUNCTION"      "FUNCTION1.SQL"
- test_delete "PROCEDURE"     "PROCEDURE1.SQL"
- test_delete "VIEW"          "VIEW1.SQL"
- test_delete "JAVA_SOURCE"   "JAVA_SOURCE1.JAVA"
- test_delete "TYPE_BODY"     "TYPE1.SQL"
- test_delete "TYPE"          "TYPE1.SQL"
- test_delete "TRIGGER"       "TRIGGER1.SQL"
+ test_delete "PACKAGE_BODY"         "PACKAGE1.SQL"
+ test_delete "PACKAGE_SPEC"         "PACKAGE1.SQL"
+ test_delete "FUNCTION"             "FUNCTION1.SQL"
+ test_delete "PROCEDURE"            "PROCEDURE1.SQL"
+ test_delete "VIEW"                 "VIEW1.SQL"
+ test_delete "JAVA_SOURCE"          "JAVA_SOURCE1.JAVA"
+ test_delete "TYPE_BODY"            "TYPE1.SQL"
+ test_delete "TYPE"                 "TYPE1.SQL"
+ test_delete "TRIGGER"              "TRIGGER1.SQL"
+ test_delete "TABLE"                "TABLE1.SQL"
+ test_delete "MATERIALIZED_VIEW"    "MVIEW1.SQL"
 
 # Test vanishing (object being dropped from database by another database session, not by ddlfs)
- test_vanish "PACKAGE_BODY"  "PACKAGE2.SQL"
- test_vanish "PACKAGE_SPEC"  "PACKAGE2.SQL"
- test_vanish "FUNCTION"      "FUNCTION2.SQL"
- test_vanish "PROCEDURE"     "PROCEDURE2.SQL"
- test_vanish "VIEW"          "VIEW2.SQL"
- test_vanish "JAVA_SOURCE"   "JAVA_SOURCE2.JAVA"
- test_vanish "TYPE_BODY"     "TYPE2.SQL"
- test_vanish "TYPE"          "TYPE2.SQL"
- test_vanish "TRIGGER"       "TRIGGER2.SQL"
+ test_vanish "PACKAGE_BODY"         "PACKAGE2.SQL"
+ test_vanish "PACKAGE_SPEC"         "PACKAGE2.SQL"
+ test_vanish "FUNCTION"             "FUNCTION2.SQL"
+ test_vanish "PROCEDURE"            "PROCEDURE2.SQL"
+ test_vanish "VIEW"                 "VIEW2.SQL"
+ test_vanish "JAVA_SOURCE"          "JAVA_SOURCE2.JAVA"
+ test_vanish "TYPE_BODY"            "TYPE2.SQL"
+ test_vanish "TYPE"                 "TYPE2.SQL"
+ test_vanish "TRIGGER"              "TRIGGER2.SQL"
+ test_vanish "TABLE"                "TABLE2.SQL"
+ test_vanish "MATERIALIZED_VIEW"    "MVIEW2.SQL"
 
 # @todo - test git & hg
 

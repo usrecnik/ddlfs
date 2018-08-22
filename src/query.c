@@ -156,6 +156,9 @@ static int str_fs2oratype(char **fstype) {
     } else if (strcmp(type, "JAVA_CLASS") == 0) {
         free(type);
         type = strdup("JAVA CLASS");
+    } else if (strcmp(type, "MATERIALIZED_VIEW") == 0) {
+        free(type);
+        type = strdup("MATERIALIZED VIEW");
     }
 
     if (type == NULL) {
@@ -167,211 +170,6 @@ static int str_fs2oratype(char **fstype) {
     return EXIT_SUCCESS;
 }
 
-/*static int qry_object_dbms_metadata(const char *schema,
-                                    const char *type,
-                                    const char *object,
-                                    const char *fname,
-                                    const int is_java_source,
-                                    const int is_trigger_source,
-                                          time_t *last_ddl_time) {
-
-    int retval = EXIT_SUCCESS;
-    char *query =
-"select \
-dbms_metadata.get_ddl(o.object_type, o.object_name, o.owner), \
-to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') \
-from all_objects o \
-where o.object_type=:bind_type \
-and o.object_name=:bind_object \
-and o.owner=:bind_schema";
-
-    OCILobLocator *o_lob = NULL; // free
-    OCIStmt       *o_stm = NULL; // free
-    OCIDefine     *o_def = NULL; // i *assume* following for OCIDefine as well:
-    OCIBind       *o_bn1 = NULL; // The bind handles re freed implicitly when
-    OCIBind       *o_bn2 = NULL; // when the statement handle is deallocated.
-    OCIBind       *o_bn3 = NULL;
-    char          *o_sel = NULL;
-    sb2            o_sel_i = 0;
-
-    char *buf = malloc(LOB_BUFFER_SIZE); // free
-    oraub8 buf_blen = LOB_BUFFER_SIZE;
-    oraub8 buf_clen = 0;
-    int lob_offset = 1;
-
-    FILE *fp = NULL; // free
-    size_t bytes_written;
-
-    if (buf == NULL) {
-        logmsg(LOG_ERROR, "Unable to malloc lob buffer (size=%d).", LOB_BUFFER_SIZE);
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if ((o_sel = malloc(30*sizeof(char))) == NULL) {
-        logmsg(LOG_ERROR, "qry_object_dbms_metadata - Unable to allocate memory for o_sel.");
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_lob_alloc(&o_lob)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_prepare(&o_stm, query)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_define(o_stm, &o_def, 1, &o_lob, 0, SQLT_CLOB)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_define_i(o_stm, &o_def, 2, o_sel, 30*sizeof(char), SQLT_STR, (dvoid*) &o_sel_i)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn1, 1, (void*) type, strlen(type)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn2, 2, (void*) object, strlen(object)+1, SQLT_STR))  {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_bind(o_stm, &o_bn3, 3, (void*) schema, strlen(schema)+1, SQLT_STR)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (ora_stmt_execute(o_stm, 1)) {
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    if (tfs_validate(fname, o_sel, last_ddl_time) == EXIT_SUCCESS) {
-        // logmsg(LOG_DEBUG, "qry_object_dbms_metadata - tempfile [%s] is up2date.");
-        goto qry_object_dbms_metadata_cleanup; // this is a bit ugly, but it's short and it works :)
-    }
-
-    fp = fopen(fname, "w");
-    if (fp == NULL) {
-        logmsg(LOG_ERROR, "Unable to open %s. Error=%d.", fname, errno);
-        retval = EXIT_FAILURE;
-        goto qry_object_dbms_metadata_cleanup;
-    }
-
-    int trg_last_nl_pos = -1;
-    int first = 1;
-    int first_offset = 0;
-    int all_bytes_written = 0;
-    while (buf_blen > 0) {
-        if (ora_check(
-            OCILobRead2(
-                g_connection.svc,
-                g_connection.err,
-                o_lob,
-                &buf_blen,
-                &buf_clen,
-                lob_offset, // offset
-                buf,
-                LOB_BUFFER_SIZE, // buffer size
-                OCI_ONE_PIECE, // Fs.
-                NULL,
-                NULL,
-                0,
-                SQLCS_IMPLICIT))) {
-                    retval = EXIT_FAILURE;
-                    goto qry_object_dbms_metadata_cleanup;
-        }
-        lob_offset += buf_blen;
-
-        if (first) {
-            // remove "create java source" from first line
-            first_offset = 0;
-            if (is_java_source == 1) {
-                first_offset = 1; // because first character is always '\n'
-                for (; first_offset < buf_blen; first_offset++)
-                    if (buf[first_offset] == '\n' || buf[first_offset] == '\r')
-                        break;
-            }
-
-            // trim leading spaces and newlines. I'm not sure why dbms_metadata
-            // writes them anyway as they are totaly useless.
-            for (; first_offset < buf_blen; first_offset++)
-                if (buf[first_offset] != ' ' && buf[first_offset] != '\n' && buf[first_offset] != '\r')
-                    break;
-
-            bytes_written = fwrite(buf + first_offset, 1, buf_blen - first_offset, fp);
-            buf_blen -= first_offset;
-        } else {
-            bytes_written = fwrite(buf, 1, buf_blen, fp);
-        }
-
-        if (bytes_written != buf_blen) {
-            retval = EXIT_FAILURE;
-            logmsg(LOG_ERROR, "Bytes written (%d) != Bytes read (%d)",
-                bytes_written, buf_blen);
-            goto qry_object_dbms_metadata_cleanup;
-        }
-
-        if (is_trigger_source) {
-            // find position of last newline in this file, dbms_metadata.get_ddl appends additional alter trigger after it (we need to remove it).
-            char *trgbuf = buf;
-            if (first)
-                trgbuf += first_offset;
-
-            for (int i = 0; i < bytes_written; i++) {
-                if (trgbuf[i] == '\n') {
-                    trg_last_nl_pos = all_bytes_written + i;
-                }
-            }
-        }
-
-        first = 0;
-        all_bytes_written += bytes_written;
-    }
-
-    // close (implicit flush) the file
-    if (fclose(fp) != 0)
-        logmsg(LOG_ERROR, "qry_object_dbms_metadata() - unable to close FILE*");
-    fp = NULL;
-
-    if (is_trigger_source) {
-        // remove last line from cached file (text to remove after last newline should be "ALTER TRIGGER "<OWNER>"."<TRIGGER>" ENABLE")
-        if (truncate(fname, trg_last_nl_pos) != 0) {
-            logmsg(LOG_ERROR, "qry_object_dbms_metadata - unable to truncate [%s]: %d - %s", fname, errno, strerror(errno));
-            retval = EXIT_FAILURE;
-        }
-    }
-
-
-qry_object_dbms_metadata_cleanup:
-
-    if (buf != NULL)
-        free(buf);
-
-    if (o_lob != NULL)
-        ora_lob_free(o_lob);
-
-    if (o_stm != NULL)
-        ora_stmt_free(o_stm);
-
-    if (o_sel != NULL)
-        free(o_sel);
-
-    if ( (fp != NULL) && (fclose(fp) != 0) )
-        logmsg(LOG_ERROR, "qry_object_dbms_metadata() - Unable to close FILE* (cleanup)");
-
-    return retval;
-}
-*/
-
 static int qry_object_all_source(const char *schema,
                                        char *type,
                                  const char *object,
@@ -380,54 +178,47 @@ static int qry_object_all_source(const char *schema,
                                  const  int is_trigger_source) {
 
     int is_view_source = ((strcmp(type, "VIEW") == 0) ? 1 : 0);
+    int is_mview_source = ((strcmp(type, "MATERIALIZED VIEW") == 0) ? 1 : 0);
     int retval = EXIT_SUCCESS;
-    char query[1024];
+    char query_fmt[1024] = "";
+    char query[1024] = "";
 
-    if (g_conf._server_version <= 1102) {
-        if (is_view_source) {
-            strcpy(query,
-// 11g ALL_VIEWS
+    if (is_view_source)
+        strcpy(query_fmt, // ALL_VIEWS
 "select w.text as s,\
  o.status,\
- null as e\
+ %s\
  from all_views w\
  join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
  where w.view_name=:bind_object and w.owner=:bind_schema");
-        } else {
-            strcpy(query,
-// 11g ALL_OBJECTS
-"select nvl(s.\"TEXT\", '\n') as s,\
+    else if (is_mview_source)
+        strcpy(query, // ALL_MVIEWS, always non-editionable
+"select w.query as s,\
  o.status,\
  null as e\
+ from all_mviews w\
+ join all_objects o on o.owner=w.owner and o.object_name=w.mview_name and o.object_type=:bind_type\
+ where w.mview_name=:bind_object and w.owner=:bind_schema");
+    else
+        strcpy(query_fmt, // ALL_OBJECTS
+"select nvl(s.\"TEXT\", '\n') as s,\
+ o.status,\
+ %s\
  from all_source s\
  join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\"\
  and (o.object_type != 'TYPE' or o.subobject_name IS NULL)\
  where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema\
  order by s.\"LINE\"");
-        }
-    } else {
-        if (is_view_source) {
-            strcpy(query,
-// 12c ALL_VIEWS
-"select w.text as s,\
- o.status,\
- o.\"EDITIONABLE\" as e\
- from all_views w\
- join all_objects o on o.owner=w.owner and o.object_name=w.view_name and o.object_type=:bind_type\
- where w.view_name=:bind_object and w.owner=:bind_schema");
-        } else {
-            strcpy(query,
-// 12c ALL_OBJECTS
-"select nvl(s.\"TEXT\", '\n') as s,\
- o.status,\
- \"EDITIONABLE\" as e\
- from all_source s\
- join all_objects o on o.\"OWNER\"=s.\"OWNER\" and o.object_name=s.\"NAME\" and o.object_type=s.\"TYPE\"\
- and (o.object_type != 'TYPE' or o.subobject_name IS NULL)\
- where s.\"TYPE\"=:bind_type and s.\"NAME\"=:bind_object and s.\"OWNER\"=:bind_schema\
- order by s.\"LINE\"");
-        }
+
+    if (!is_mview_source) {
+        // all_objects.editionable column was introduced in 12.1
+        if (g_conf._server_version <= 1102)
+            snprintf(query, 1024, query_fmt, "null as e");
+        else
+            snprintf(query, 1024, query_fmt, "o.\"EDITIONABLE\" as e");
     }
+
+    FILE *fp = NULL;
 
     ORA_STMT_PREPARE (qry_object_all_source);
     ORA_STMT_DEFINE_STR_I(qry_object_all_source, 1, text,        4*1024*1024);
@@ -440,7 +231,6 @@ static int qry_object_all_source(const char *schema,
 
     char tmpstr[4096];
     size_t bytes_written;
-    FILE *fp = NULL;
     int first = 1;
     int type_spaces = 0;
     char *tmp = type;
@@ -477,15 +267,18 @@ static int qry_object_all_source(const char *schema,
                 goto qry_object_all_source_cleanup;
             }
 
-            if (!is_java_source && !is_trigger_source && !is_view_source) {
+            if (!is_java_source && !is_trigger_source && !is_view_source && !is_mview_source) {
                 sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".", editionable, type, schema);
                 fwrite(tmpstr, 1, strlen(tmpstr), fp);
             }
 
         }
 
-        if (first && is_view_source) {
-            sprintf(tmpstr, "CREATE OR REPLACE FORCE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
+        if (first && (is_view_source || is_mview_source)) {
+            if (is_view_source)
+                sprintf(tmpstr, "CREATE OR REPLACE FORCE%s %s \"%s\".\"%s\" AS \n", editionable, type, schema, object);
+            else
+                sprintf(tmpstr, "CREATE %s \"%s\".\"%s\" AS \n", type, schema, object);
             fwrite(tmpstr, 1, strlen(tmpstr), fp);
 
             if (i_text < 0) { // TEXT is null
@@ -562,7 +355,7 @@ static int qry_object_all_source(const char *schema,
             continue;
         }
 
-        if (first && !is_view_source && !is_java_source && !is_trigger_source) {
+        if (first && !is_view_source && !is_java_source && !is_trigger_source && !is_mview_source) {
             // replace multiple spaces with single space
             org = ORA_NVL(text, " ");
             tmp = ORA_NVL(text, " ");
@@ -619,14 +412,11 @@ static int qry_object_all_source(const char *schema,
         /* Create empty file (if we die with error here, then mercurial/git probably won't work properly).
            This is Oracle Bug, objects without sources should never exist, although they do sometimes, like in this case,
            where object in PDB references object in CDB, which does not exist:
-
             SQL> select con_id, sharing, owner, object_name from cdb_objects where object_name='WWV_DBMS_SQL';
-
                     CON_ID SHARING         OWNER      OBJECT_NAME
                 ---------- --------------- ---------- ------------------------------
                          3 METADATA LINK   SYS        WWV_DBMS_SQL
                          3 METADATA LINK   SYS        WWV_DBMS_SQL
-
         */
 
         fp = fopen(fname, "w");
@@ -692,7 +482,10 @@ static int qry_last_ddl_time(const char *schema,
     else if (strcmp(type, "JAVA SOURCE") == 0)
         type_id = 28;
     else if (strcmp(type, "MATERIALIZED VIEW") == 0)
-        type_id = 42; // @todo - mv are not yet supported.
+        type_id = 42;
+    else {
+        logmsg(LOG_ERROR, "qry_last_ddl_time(): Unsupported type [%s]!", type);
+    }
 
     OCIBind *o_bn2;
     ORA_STMT_PREPARE(qry_last_ddl_time);
@@ -971,6 +764,7 @@ int qry_types(t_fsentry *schema) {
     char *types[] = {
         "FUNCTION",
         "JAVA_SOURCE",
+        "MATERIALIZED_VIEW",
         "PACKAGE_BODY",
         "PACKAGE_SPEC",
         "PROCEDURE",
@@ -1091,7 +885,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
     }
-
+    
     if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) type_name, strlen(type_name)+1, SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;

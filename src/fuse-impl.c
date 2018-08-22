@@ -256,7 +256,9 @@ int fs_getattr( const char *path, struct stat *st )
         st->st_nlink = 2;
         st->st_mode = S_IFDIR | 0644;
     } else {
-        if (depth == DEPTH_MAX && strcasecmp(part[DEPTH_TYPE], "TABLE") == 0) {
+        if ((depth == DEPTH_MAX) &&
+            ((strcasecmp(part[DEPTH_TYPE], "TABLE") == 0) || (strcasecmp(part[DEPTH_TYPE], "MATERIALIZED_VIEW") == 0))) {
+            // tables and materialized views are always read only as they cannot be "create or REPLACEd"
             st->st_mode = S_IFREG | 0444;
         } else {
             if (entry->ftype == 'F')
@@ -437,7 +439,6 @@ int fs_release(const char *path,
     size_t buf_len = 0;
     char *buf = NULL;
     int fd = -1;
-    int is_java_source = 0;
     int cache_already_removed = 0;
 
     if (strcmp(path, "/ddlfs.log") == 0)
@@ -449,8 +450,9 @@ int fs_release(const char *path,
     qry_object_fname(
         part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
 
-    if (strcmp(part[DEPTH_TYPE], "JAVA_SOURCE") == 0 || strcmp(part[DEPTH_TYPE], "java_source") == 0)
-        is_java_source = 1;
+    int is_java_source = (strcmp(part[DEPTH_TYPE], "JAVA_SOURCE") == 0 ? 1 : 0);
+    int is_table_source = (strcmp(part[DEPTH_TYPE], "TABLE") == 0 ? 1 : 0);
+    int is_mview_source = (strcmp(part[DEPTH_TYPE], "MATERIALIZED_VIEW") == 0 ? 1 : 0);
 
     if (close(fi->fh) != 0) {
         // closing also flushes metadata, such as mtime
@@ -469,6 +471,8 @@ int fs_release(const char *path,
         }
         if (tmp_stat.st_mtime == 0) {
             logmsg(LOG_DEBUG, "fs_release() - no write occured even though file was opened as r/w.");
+        } else if (is_table_source || is_mview_source) {
+            logmsg(LOG_ERROR, "fs_release() - write not supported for TABLE and MATERIALIZED_VIEW types.");
         } else {
             logmsg(LOG_DEBUG, "(temp file size is %d bytes)", tmp_stat.st_size);
 
@@ -715,23 +719,27 @@ int fs_unlink(const char *path) {
     }
 
     if (strcmp(object_type, "PROCEDURE") == 0)
-        snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"",    object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP PROCEDURE \"%s\".\"%s\"",            object_schema, object_name);
     else if (strcmp(object_type, "FUNCTION") == 0)
-        snprintf(drop_ddl, 1023, "DROP FUNCTION \"%s\".\"%s\"",     object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP FUNCTION \"%s\".\"%s\"",             object_schema, object_name);
     else if (strcmp(object_type, "VIEW") == 0)
-        snprintf(drop_ddl, 1023, "DROP VIEW \"%s\".\"%s\"",         object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP VIEW \"%s\".\"%s\"",                 object_schema, object_name);
     else if (strcmp(object_type, "TYPE") == 0)
-        snprintf(drop_ddl, 1023, "DROP TYPE \"%s\".\"%s\"",         object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP TYPE \"%s\".\"%s\"",                 object_schema, object_name);
     else if (strcmp(object_type, "TYPE_BODY") == 0)
-        snprintf(drop_ddl, 1023, "DROP TYPE BODY \"%s\".\"%s\"",    object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP TYPE BODY \"%s\".\"%s\"",            object_schema, object_name);
     else if (strcmp(object_type, "PACKAGE_SPEC") == 0)
-        snprintf(drop_ddl, 1023, "DROP PACKAGE \"%s\".\"%s\"",      object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP PACKAGE \"%s\".\"%s\"",              object_schema, object_name);
     else if (strcmp(object_type, "PACKAGE_BODY") == 0)
-        snprintf(drop_ddl, 1023, "DROP PACKAGE BODY \"%s\".\"%s\"", object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP PACKAGE BODY \"%s\".\"%s\"",         object_schema, object_name);
     else if (strcmp(object_type, "JAVA_SOURCE") == 0)
-        snprintf(drop_ddl, 1023, "DROP JAVA SOURCE \"%s\".\"%s\"",  object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP JAVA SOURCE \"%s\".\"%s\"",          object_schema, object_name);
     else if (strcmp(object_type, "TRIGGER") == 0)
-        snprintf(drop_ddl, 1023, "DROP TRIGGER \"%s\".\"%s\"",      object_schema, object_name);
+        snprintf(drop_ddl, 1023, "DROP TRIGGER \"%s\".\"%s\"",              object_schema, object_name);
+    else if (strcmp(object_type, "TABLE") == 0)
+        snprintf(drop_ddl, 1023, "DROP TABLE \"%s\".\"%s\"",                object_schema, object_name);
+    else if (strcmp(object_type, "MATERIALIZED_VIEW") == 0)
+        snprintf(drop_ddl, 1023, "DROP MATERIALIZED VIEW \"%s\".\"%s\"",    object_schema, object_name);
     else {
         logmsg(LOG_ERROR, "fs_unlink() - Cannot drop object %s.%s, operation not (yet?) supported.",
             part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
@@ -743,14 +751,12 @@ int fs_unlink(const char *path) {
 
     // delete cache file
     char *cache_fn = NULL;
-    logmsg(LOG_DEBUG, "DBG0: qry_object_fname(%s, %s, %s)", part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT]);
     if (qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &cache_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "fs_unlink() - unable to determin cache filename for [%s] [%s].[%s]", part[DEPTH_TYPE], part[DEPTH_SCHEMA], part[DEPTH_OBJECT]);
         return -EINVAL;
     }
     if (access(cache_fn, F_OK) == 0)
-        tfs_rmfile(cache_fn);    
-    logmsg(LOG_DEBUG, "DBG1: removed cache_fn=[%s]", cache_fn);
+        tfs_rmfile(cache_fn);
 
     // remove vfs vfs_etry
     t_fsentry *vfs_schema = vfs_entry_search(g_vfs, part[DEPTH_SCHEMA]);
@@ -758,7 +764,7 @@ int fs_unlink(const char *path) {
         t_fsentry *vfs_type = vfs_entry_search(vfs_schema, part[DEPTH_TYPE]);
         if (vfs_type != NULL) {
             vfs_entry_free(vfs_type, 1);
-            logmsg(LOG_DEBUG, "DBG2: cleared vfs for [%s]/[%s]", vfs_schema->fname, vfs_type->fname);
+            logmsg(LOG_DEBUG, "fs_unlink() - cleared vfs for [%s]/[%s]", vfs_schema->fname, vfs_type->fname);
         }
     }
 
