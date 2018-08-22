@@ -13,10 +13,12 @@ Installation
 
 `.rpm` and `.deb` packages were tested on:
 
-* Ubuntu 16.4 and 17.4
-* Oracle Enterprise Linux 6.0 and 7.4
+* Ubuntu 16.4 and 18.4
+* Oracle Enterprise Linux 6.0 and 7.5
 
 Older/other versions might need to compile from source (due to different libc and fuse versions).
+
+Supported Oracle Database versions are 10g, 11g, 12c, 18c.
 
 
 Usage
@@ -28,13 +30,15 @@ or
 In the latter, you can optionally use `-f` flag to run filesystem in foreground (especially useful with `loglevel=DEBUG` :-) )
 
 When mounted, following directory tree is available under mountpoint:
- 
+
 * `<schema>`
   * `FUNCTION`
   * `JAVA_SOURCE`
+  * `MATERIALIZED_VIEW` _(read only)_
   * `PACKAGE_BODY`
   * `PACKAGE_SPEC`
   * `PROCEDURE`
+  * `TABLE` _(read only)_
   * `TRIGGER`
   * `TYPE`
   * `TYPE_BODY`
@@ -48,14 +52,14 @@ via this filesystem). Filesystem keeps a local copy on regular filesystem while 
 
 If you delete such `.SQL` file, a `DROP <object_type> <object_name>` is issued.
 
-If you create new file (e.g. using `touch` utility), a new object is created from template - e.g. for views, it is 
+If you create new file (e.g. using `touch` utility), a new object is created from template - e.g. for views, it is
 `create view "<schema>"."<object_name>" as select * from dual"`.
 
 All files have last modified date set to `last_ddl_time` from `all_objects` view. All files report file size 0 (or whatever
-number is set for `filesize=` parameter); except for those that are currently open - those report their actual, correct, file size. 
+number is set for `filesize=` parameter); except for those that are currently open - those report their actual, correct, file size.
 
-One special file exists, `ddlfs.log`, which contains log of every executed DDL operation along with possible errors and 
-warnings (e.g. indicating on which line syntax error occured). You can `tail -F` this file - just use capital `-F`, because this file 
+One special file exists, `ddlfs.log`, which contains log of every executed DDL operation along with possible errors and
+warnings (e.g. indicating on which line syntax error occured). You can `tail -F` this file - just use capital `-F`, because this file
 only exists in-memory and is rewritten in cyclic manner.
 
 
@@ -82,33 +86,37 @@ Schema or list of schemas, separated by `:`. Those are schemas of which objects 
 sign, e.g.: `APP_%:BLA_%`, which would match all schemas with names starting with either `APP_` or `BLA_`. It defaults '%' (to show all schemas).
 
 **`pdb=`=**`string`  
-If you use os authentication, you'll be connected to `CDB$ROOT` by default in multitenan environment. This setting, if specified, 
+If you use os authentication, you'll be connected to `CDB$ROOT` by default in multitenan environment. This setting, if specified,
 will cause **ddlfs** to issue `alter session set container=<pdb>;` right after logon.
 
 **`userrole`=**`string`  
-You can specify role such as `SYSDBA` or `SYSOPER` here. 
-
-**`lowercase`**  
-Convert all filenames to lowercase, ignoring the original case as stored in database. You can only use this option if you are sure that all object names have distinct file names when converted to lowercase.
+You can specify role such as `SYSDBA` or `SYSOPER` here.
 
 **`loglevel=`**`[DEBUG|INFO|ERROR]`  
 Defines verbosity used for stdout messages. Default value is `INFO`.
 
 **`temppath=`**`/tmp`  
-Where to store temporary files - offline copies of DDL statements while their files are open. 
+Where to store temporary files - offline copies of DDL statements while their files are open.
 `/tmp` location is used by default. All files created by **ddlfs** have names prefixed by `ddlfs-<PID>` in this folder.
 
 **`keepcache`**  
-Local temporary files (created in `temppath=` folder) are deleted on umount by default. Specify this mount option to 
-keep those temp files intact after umount. This has performance benefits when using `filesize=-1`. 
+Local temporary files (created in `temppath=` folder) are deleted on umount by default. Specify this mount option to
+keep those temp files intact after umount. This has performance benefits when using `filesize=-1`.
+
+**`dbro`**
+Using this option will assume that database is opened as `READ ONLY`. That means that we can read
+any object just once and never check if it has changed on database, because due to database
+being open in `READ ONLY` means it cannot change. You can use this option even if database
+is *not* in `READ ONLY` mode - this is useful for tools which can benefit from such a "snapshot"
+view and increased performance (e.g. git & mercurial).
 
 **`filesize=`**`0`  
-All `.sql` files report file size as specified by this parameter - unless if file is currently open; correct file size 
-is always returned for currently open files. Using default value `0` (or not specifying this parameter) should be OK for 
-most cases, however, some applications refuse to read files with zero length and only read files up to returned file size. 
-If you use such application with `ddlfs` specify this parameter to be `-1`, which will cause ddlfs to *always* return correct file sizes. This 
+All `.sql` files report file size as specified by this parameter - unless if file is currently open; correct file size
+is always returned for currently open files. Using default value `0` (or not specifying this parameter) should be OK for
+most cases, however, some applications refuse to read files with zero length and only read files up to returned file size.
+If you use such application with `ddlfs` specify this parameter to be `-1`, which will cause ddlfs to *always* return correct file sizes. This
 has a bit of performance penalty as `ddlfs` must read contents of every object of specified type in order to list their correct file sizes (`ls -l`).
-Possible alternative is to set this parameter to any value larger then any database object, e.g. to `10485760`, this is 10mb, which should be 
+Possible alternative is to set this parameter to any value larger then any database object, e.g. to `10485760`, this is 10mb, which should be
 enough in most cases). Note that this may also confuse some applications.
 
 Tips for VIM
@@ -132,11 +140,23 @@ set directory=~/.vim/swapfiles//
 
 Version Control
 ---------------
-You can use this filesystem with version control software such as Git or Mercurial. So far I've tested:
+You can use this filesystem with version control software such as Git or Mercurial. For best
+performance try to use following mount options (and (re)mount before each `git add` & `git commit` cycle):
 
-* Mercurial (`hg`) seems to work without any issues (use default value `0` for `filesize` mount option).
-* Git also seems to work, but requires mount option `filesize=-1`, which means a bit worse performance. Consider also using `keepcache` mount option in this case.
-* Subversion won't work because it wants to create `.svn` subfolder in *every* folder. Problem is that ddlfs only 
+`ro,dbro,username=/,password=/,database=/,userrole=SYSDBA,schemas=%,filesize=-1,keepcache,temppath=/vbs/ddlfs/_cache/`
+
+Subversion won't work because it wants to create `.svn` subfolder in *every* folder. Problem is that ddlfs only
 supports storing of DDL in `.SQL` files. (Git and Mercurial only require one folder bellow mountpoint and that's all)
 
+Compiling
+---------
+1. Download Oracle Instant Client (Basic + SDK Package):  
+http://www.oracle.com/technetwork/database/database-technologies/instant-client/overview/index.html
 
+2. Files will probably be named something like  
+2.1. instantclient-**basic**-linux.x64-18.3.0.0.0dbru.zip  
+2.2. instantclient-**sdk**-linux.x64-18.3.0.0.0dbru.zip
+
+3. Extract both files to the _same_ location, which is specified in `Makefile` (on line which starts with `LD_LIBRARY_PATH=...`)
+
+4. Run `make clean all` from `./src/` folder.
