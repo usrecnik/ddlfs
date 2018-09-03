@@ -109,7 +109,7 @@ int dbr_refresh_cache() {
     const char *query =
 "select o.owner, o.object_type, o.object_name, \
  to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
- from dba_objects o\
+ from all_objects o\
  where generated='N'\
  and (o.object_type != 'TYPE' or o.subobject_name IS NULL)\
  and object_type IN (\
