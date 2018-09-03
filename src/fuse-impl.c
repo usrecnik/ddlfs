@@ -256,17 +256,22 @@ int fs_getattr( const char *path, struct stat *st )
         st->st_nlink = 2;
         st->st_mode = S_IFDIR | 0644;
     } else {
-        if ((depth == DEPTH_MAX) &&
-            ((strcasecmp(part[DEPTH_TYPE], "TABLE") == 0) || (strcasecmp(part[DEPTH_TYPE], "MATERIALIZED_VIEW") == 0))) {
-            // tables and materialized views are always read only as they cannot be "create or REPLACEd"
+        if (g_conf.dbro == 1) {
+            // https://github.com/usrecnik/ddlfs/issues/11
             st->st_mode = S_IFREG | 0444;
         } else {
-            if (entry->ftype == 'F')
-                st->st_mode = S_IFREG | 0744;
-            else
-                st->st_mode = S_IFREG | 0644;
+            if ((depth == DEPTH_MAX) &&
+                ((strcasecmp(part[DEPTH_TYPE], "TABLE") == 0) || (strcasecmp(part[DEPTH_TYPE], "MATERIALIZED_VIEW") == 0))) {
+                // tables and materialized views are always read only as they cannot be "create or REPLACEd"
+                st->st_mode = S_IFREG | 0444;
+            } else {
+                if (entry->ftype == 'F')
+                    st->st_mode = S_IFREG | 0744;
+                else
+                    st->st_mode = S_IFREG | 0644;
+            }
         }
-
+        
         st->st_nlink = 1;
         st->st_size = tmp_st.st_size;
     }
