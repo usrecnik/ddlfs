@@ -15,8 +15,19 @@ fi
 mkdir "$CFG_CACHE_DIR"
 
 sqlplus $CFG_USERNAME/$CFG_PASSWORD@dbhost:1521/ddlfs.abakus.si << eof
-    create view $CFG_USERNAME.VIEW_DBRO_VW
-        as select * from dual;    
+    create or replace view $CFG_USERNAME.VIEW_DBRO_VW
+        as select * from dual;
+    create or replace package $CFG_USERNAME.PACKAGE_X as
+        procedure tmp;
+    end;
+    /
+    create or replace package body $CFG_USERNAME.PACKAGE_X as
+        procedure tmp as
+        begin
+            null;
+        end;
+    end;
+    /
 eof
 
 ddlfs -f -o\

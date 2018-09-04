@@ -138,38 +138,6 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
     return 0;
 }
 
-static int str_fs2oratype(char **fstype) {
-    char *type = *fstype;
-
-    if (strcmp(type, "PACKAGE_SPEC") == 0) {
-        free(type);
-        type = strdup("PACKAGE");
-    } else if (strcmp(type, "PACKAGE_BODY") == 0) {
-        free(type);
-        type = strdup("PACKAGE BODY");
-    } else if (strcmp(type, "TYPE_BODY") == 0) {
-        free(type);
-        type = strdup("TYPE BODY");
-    } else if (strcmp(type, "JAVA_SOURCE") == 0) {
-        free(type);
-        type = strdup("JAVA SOURCE");
-    } else if (strcmp(type, "JAVA_CLASS") == 0) {
-        free(type);
-        type = strdup("JAVA CLASS");
-    } else if (strcmp(type, "MATERIALIZED_VIEW") == 0) {
-        free(type);
-        type = strdup("MATERIALIZED VIEW");
-    }
-
-    if (type == NULL) {
-        logmsg(LOG_ERROR, "str_fs2oratype() - unable to malloc for normalized type.");
-        return EXIT_FAILURE;
-    }
-
-    *fstype = type;
-    return EXIT_SUCCESS;
-}
-
 static int qry_object_all_source(const char *schema,
                                        char *type,
                                  const char *object,
@@ -561,7 +529,7 @@ int qry_object(char *schema,
         return EXIT_FAILURE;
     }
 
-    if (str_fs2oratype(&object_type) != EXIT_SUCCESS) {
+    if (utl_fs2oratype(&object_type) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object() - unable to convert fs type to ora type.");
         if (object_schema != NULL) free(object_schema);
         if (object_type != NULL) free(object_type);
@@ -842,7 +810,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         return EXIT_FAILURE;
     }
 
-    if (str_fs2oratype(&type_name) != EXIT_SUCCESS) {
+    if (utl_fs2oratype(&type_name) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_objects() - unable to convert fs type to ora type.");
         if (type_name != NULL)
             free(type_name);
@@ -885,7 +853,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
     }
-    
+
     if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) type_name, strlen(type_name)+1, SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;

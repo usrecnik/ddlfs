@@ -16,30 +16,42 @@
 #include "query.h"
 
 static int dbr_refresh_object(const char *schema,
-                              const char *type,
+                              const char *ora_type,
                               const char *object,
                               time_t last_ddl_time) {
 
     char object_with_suffix[300];
 
+    // convert oracle type to filesystem type
+    char *fs_type = strdup(ora_type);
+    if (fs_type == NULL) {
+        logmsg(LOG_ERROR, "dbr_refresh_object(): unable to allocate memory for ora_type");
+        return EXIT_FAILURE;
+    }
+    utl_ora2fstype(&fs_type);
+
     // get suffix based on type
     char *suffix = NULL;
-    if (str_suffix(&suffix, type) != EXIT_SUCCESS) {
+    if (str_suffix(&suffix, ora_type) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "dbr_refresh_object(): unable to determine file suffix");
         if (suffix != NULL)
             free(suffix);
+        if (fs_type != NULL)
+            free(fs_type);
         return EXIT_FAILURE;
     }
     snprintf(object_with_suffix, 299, "%s%s", object, suffix);
 
     // get cache filename
     char *fname = NULL;
-    if (qry_object_fname(schema, type, object_with_suffix, &fname) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "dbr_refresh_object(): unable to determine cache filename for [%s] [%s].[%s]", type, schema, object_with_suffix);
+    if (qry_object_fname(schema, fs_type, object_with_suffix, &fname) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "dbr_refresh_object(): unable to determine cache filename for [%s] [%s].[%s]", ora_type, schema, object_with_suffix);
         if (fname != NULL)
             free(fname);
         if (suffix != NULL)
             free(suffix);
+        if (fs_type != NULL)
+            free(fs_type);
         return EXIT_FAILURE;
     }
 
@@ -47,17 +59,20 @@ static int dbr_refresh_object(const char *schema,
     if (tfs_validate2(fname, last_ddl_time) == EXIT_SUCCESS) {
         // then mark it as verified by this mount
         if (tfs_setldt(fname, last_ddl_time) != EXIT_SUCCESS) {
-            logmsg(LOG_ERROR, "dbr_refresh_object(): unable to mark [%s] [%s].[%s] as verified by this mount.", type, schema, object);
+            logmsg(LOG_ERROR, "dbr_refresh_object(): unable to mark [%s] [%s].[%s] as verified by this mount.", ora_type, schema, object);
             if (fname != NULL)
                 free(fname);
             if (suffix != NULL)
                 free(suffix);
+            if (fs_type != NULL)
+                free(fs_type);
             return EXIT_FAILURE;
         }
     }
 
     free(fname);
     free(suffix);
+    free(fs_type);
     return EXIT_SUCCESS;
 }
 
@@ -100,7 +115,7 @@ static int dbr_delete_obsolete() {
         }
     }
     closedir(dir);
-    
+
     return EXIT_SUCCESS;
 }
 

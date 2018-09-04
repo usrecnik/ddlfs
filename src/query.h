@@ -9,6 +9,7 @@
 
 /**
  * Determine correct suffix (such as .sql or .java) for specified objectType.
+ * objectType is in filesystem format ("PACKAGE_SPEC", not "PACKAGE")
  * */
 int str_suffix(char **dst, const char *objectType);
 
