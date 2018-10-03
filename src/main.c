@@ -21,7 +21,7 @@
 #include "tempfs.h"
 #include "dbro_refresh.h"
 
-#define DDLFS_VERSION "2.2p1"
+#define DDLFS_VERSION "2.3"
 
 void sigusr1_handler(int signo) {
     logmsg(LOG_INFO, " ");
