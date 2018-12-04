@@ -6,9 +6,15 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <ctype.h>
-#include <utime.h>
+#ifndef _MSC_VER
+	// @todo: check if we actually need those
+	#include <unistd.h>
+	#include <utime.h>
+#else
+	#pragma warning(disable:4996)
+	#include <sys/utime.h>
+#endif
 
 #include "config.h"
 #include "logging.h"
@@ -18,11 +24,12 @@
 #include "util.h"
 #include "query_tables.h"
 
-#define LOB_BUFFER_SIZE 8196
+#define PATH_MAX 8192
+#define LOB_BUFFER_SIZE 8192
 
 
 static int str_append(char **dst, char *src) {
-    int len = (*dst == NULL ? strlen(src) : strlen(*dst) + strlen(src));
+    size_t len = (*dst == NULL ? strlen(src) : strlen(*dst) + strlen(src));
     char *tmp = malloc(len+2);
     if (tmp == NULL) {
         logmsg(LOG_ERROR, "Unable to malloc for tmp string_copy buffer (len=%d)", len);
@@ -99,8 +106,8 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
         }
 
         // safety check
-        int len = strlen(*dst);
-        int expectedLen = strlen(expectedSuffix);
+        size_t len = strlen(*dst);
+        size_t expectedLen = strlen(expectedSuffix);
         if (expectedLen >= len) {
             logmsg(LOG_ERROR, "Expected suffix [%s] is longer than original name [%s]", expectedSuffix, *dst);
             free(expectedSuffix);
@@ -114,7 +121,7 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
         }
 
         for (int i = 0; i < expectedLen; i++) {
-            int c = len-i-1;
+            size_t c = len-i-1;
             if (c < 0)
                 actualSuffix[i] = '\0';
             else
@@ -277,9 +284,17 @@ static int qry_object_all_source(const char *schema,
                 for (int i = 0; i < 3; i++) {
 
                     char *kw_haystack = ORA_NVL(text, " ");
+					char *kw_haystack_u = strdup(kw_haystack);
+					if (kw_haystack_u == NULL) {
+						logmsg(LOG_ERROR, "qry_object_all_source(): Unable to copy kw_haystack");
+						goto qry_object_all_source_cleanup;
+					}
+					for (size_t j = 0; j < strlen(kw_haystack_u); j++)
+						kw_haystack_u[j] = (char) toupper(kw_haystack_u[j]);
 
                     trigger_retry_keyword:
-                    kw_found = strcasestr(kw_haystack, kw_all[i]);
+                    // kw_found = strcasestr(kw_haystack, kw_all[i]); // strcasestr is not available on Windows
+					kw_found = strstr(kw_haystack_u, kw_all[i]);
                     if (kw_found != NULL) {
                         kw_which = kw_all[i];
                         kw_after = kw_found + strlen(kw_which);
@@ -397,7 +412,10 @@ static int qry_object_all_source(const char *schema,
         fwrite(empty_msg, 1, strlen(empty_msg), fp);
     }
 
+#ifndef _MSC_VER
+	// this makes no sense on Windows anyway
     chmod(fname, validity == 0 ? 0744 : 0644);
+#endif
 
 qry_object_all_source_cleanup:
     ORA_STMT_FREE;
@@ -463,7 +481,7 @@ static int qry_last_ddl_time(const char *schema,
     if (g_conf._isdba == 1)
         ora_stmt_bind(o_stm, &o_bn2, 2, (void*) &type_id, sizeof(int), SQLT_INT);
     else
-        ora_stmt_bind(o_stm, &o_bn2, 2, (void*) type, strlen(type)+1, SQLT_STR);
+        ora_stmt_bind(o_stm, &o_bn2, 2, (void*) type, (sb4) strlen(type)+1, SQLT_STR);
     if (r) {
         logmsg(LOG_ERROR, "qry_last_ddl_time(): Unable to bind type");
         retval = EXIT_FAILURE;
@@ -665,7 +683,8 @@ int qry_schemas() {
 
     while (ORA_STMT_FETCH) {
         // convert created date
-        struct tm *temptime = malloc(sizeof(struct tm));
+        /*
+		struct tm *temptime = malloc(sizeof(struct tm));
         if (temptime == NULL) {
             logmsg(LOG_ERROR, "qry_schemas(): unable to allocate memory for temptime");
             retval = EXIT_FAILURE;
@@ -681,6 +700,8 @@ int qry_schemas() {
         }
         time_t created_time = timegm(temptime);
         free(temptime);
+		*/
+		time_t created_time = utl_str2time(ORA_VAL(created));
         // end of date conversion
 
         t_fsentry *entry = vfs_entry_create('D', o_username, created_time, created_time);
@@ -849,12 +870,12 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         goto qry_objects_cleanup;
     }
 
-    if (ora_stmt_bind(o_stm, &o_bnd[0], 1, (void*) schema_name, strlen(schema_name)+1, SQLT_STR)) {
+    if (ora_stmt_bind(o_stm, &o_bnd[0], 1, (void*) schema_name, (sb4) (strlen(schema_name)+1), SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
     }
 
-    if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) type_name, strlen(type_name)+1, SQLT_STR)) {
+    if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) type_name, (sb4) (strlen(type_name)+1), SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto qry_objects_cleanup;
     }
@@ -865,7 +886,7 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
     }
 
     while (ora_stmt_fetch(o_stm) == OCI_SUCCESS) {
-
+		/*
         memset(temptime, 0, sizeof(struct tm));
         char* xx = strptime(((char*)o_sel[1]), "%Y-%m-%d %H:%M:%S", temptime);
         if (*xx != '\0') {
@@ -875,6 +896,8 @@ where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
         }
 
         time_t t_modified = timegm(temptime);
+		*/
+		time_t t_modified = utl_str2time((char*)o_sel[1]);
         size_t fname_len = ((strlen((char*)o_sel[0])+strlen(suffix))+1)*sizeof(char);
         char *fname = malloc(fname_len);
         if (fname == NULL) {
@@ -963,12 +986,12 @@ ORDER BY \"SEQUENCE\"";
         goto log_ddl_errors_cleanup;
     }
 
-    if (ora_stmt_bind(o_stm, &o_bnd[0], 1, (void*) schema, strlen(schema)+1, SQLT_STR)) {
+    if (ora_stmt_bind(o_stm, &o_bnd[0], 1, (void*) schema, (sb4) (strlen(schema)+1), SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto log_ddl_errors_cleanup;
     }
 
-    if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) object, strlen(object)+1, SQLT_STR)) {
+    if (ora_stmt_bind(o_stm, &o_bnd[1], 2, (void*) object, (sb4) (strlen(object)+1), SQLT_STR)) {
         retval = EXIT_FAILURE;
         goto log_ddl_errors_cleanup;
     }

@@ -4,12 +4,21 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/xattr.h>
-#include <dirent.h>
+#ifndef _MSC_VER
+	#include <unistd.h>
+	#include <sys/xattr.h>
+	#include <dirent.h>
+#else
+	#include <windows.h>
+	#include <io.h>
+	#pragma warning(disable:4996)
+	#define strdup _strdup
+	#define pid_t int
+	#define F_OK 0
+#endif
 
 #include "config.h"
 #include "logging.h"
@@ -21,7 +30,7 @@
  * basically, return the same string, except replace suffix with ".dfs"
  * */
 static int tfs_getldt_fn(const char *cache_fn, char **meta_fn) {
-    int len=strlen(cache_fn);
+    size_t len = strlen(cache_fn);
     if (len < 5) {
         logmsg(LOG_ERROR, "tfs_getldt_fn - cache file name [%s] is too short.", cache_fn);
         return EXIT_FAILURE;
@@ -42,7 +51,7 @@ static int tfs_getldt_fn(const char *cache_fn, char **meta_fn) {
 
 
 static inline int tfs_fwrite(const void *ptr, size_t size, FILE *stream) {
-    int len = fwrite(ptr, 1, size, stream);
+    size_t len = fwrite(ptr, 1, size, stream);
     if (len != size) {
         logmsg(LOG_ERROR, "tfs_fwrite() - Unable to write to meta file");
         fclose(stream);
@@ -113,7 +122,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
         return EXIT_FAILURE;
     }
 
-    int len = fread(last_ddl_time, 1, sizeof(time_t), fp);
+    size_t len = fread(last_ddl_time, 1, sizeof(time_t), fp);
     if (len != sizeof(time_t)) {
         logmsg(LOG_ERROR, "tfs_getldf - unable to read meta file [%s], field 1,  got [%d] bytes, expected [%d]", meta_fn, len, sizeof(time_t));
         if (ferror(fp) != 0) {
@@ -204,7 +213,7 @@ int tfs_quick_validate(const char *path) {
             free(meta_fn);
         return EXIT_FAILURE;
     }
-
+	
     if (access(meta_fn, F_OK) == -1) {
         logmsg(LOG_DEBUG, "tfs_quick_validate - cache file [%s] does not yet exist.", meta_fn);
         free(meta_fn);
@@ -271,6 +280,7 @@ static int tfs_strend(const char *haystack, const char *suffix) {
     return 0;
 }
 
+#ifndef _MSC_VER
 int tfs_rmdir(int ignoreNoDir) {
 
     // remove files in directory
@@ -278,7 +288,7 @@ int tfs_rmdir(int ignoreNoDir) {
     struct dirent *ent;
     if ((dir = opendir (g_conf._temppath)) == NULL) {
         if (ignoreNoDir != 1 || errno != ENOENT)
-            logmsg(LOG_ERROR, "tfs_rmdir - unable to open directory (%d): %d - %s", g_conf._temppath, errno, strerror(errno));
+            logmsg(LOG_ERROR, "tfs_rmdir - unable to open directory [%s]: %d %s", g_conf._temppath, errno, strerror(errno));
         return EXIT_FAILURE;
     }
 
@@ -310,6 +320,37 @@ int tfs_rmdir(int ignoreNoDir) {
 
     return EXIT_SUCCESS;
 }
+#else
+int tfs_rmdir(int ignoreNoDir) {
+	WIN32_FIND_DATA file;
+	HANDLE hFind = NULL;
+	char abs_path[8192];
+
+	if ((hFind = FindFirstFile(g_conf._temppath, &file)) == INVALID_HANDLE_VALUE) {
+		if (ignoreNoDir != 1)
+			printf("tfs_rmdir - unable to open directory because it probably doesn't exist (%s)\n", g_conf._temppath);
+		return EXIT_FAILURE;
+	}
+
+	do {
+		if (strcmp(file.cFileName, ".") == 0)
+			continue;
+
+		if (strcmp(file.cFileName, "..") == 0)
+			continue;
+
+		sprintf(abs_path, "%s\\%s", g_conf._temppath, file.cFileName);
+		if (!(file.dwFileAttributes &FILE_ATTRIBUTE_DIRECTORY)) {
+			if (!DeleteFileA(abs_path))
+				printf("tfs_rmdir - unable to delete file [%s]!", abs_path);
+		}
+
+	} while (FindNextFile(hFind, &file)); //Find the next file.
+
+	FindClose(hFind); //Always, Always, clean things up!
+	return EXIT_SUCCESS;
+}
+#endif
 
 int tfs_mkdir() {
 
@@ -327,7 +368,7 @@ int tfs_mkdir() {
         g_conf.schemas);
 
     // replace "special" characters
-    for (int i = strlen(g_conf.temppath)+1; i < strlen(g_conf._temppath); i++) {
+    for (size_t i = strlen(g_conf.temppath)+1; i < strlen(g_conf._temppath); i++) {
         char c = g_conf._temppath[i];
         if (c >= '0' && c <= '9')
             continue;
@@ -353,10 +394,17 @@ int tfs_mkdir() {
     struct stat st;
     if (stat(g_conf._temppath, &st) == -1) {
         if (errno == ENOENT) {
+#ifndef _MSC_VER
             if (mkdir(g_conf._temppath, 0700) != 0) {
                 logmsg(LOG_ERROR, "tfs_mkdir - unable to create temporary directory [%s]: %d - %s", g_conf._temppath, errno, strerror(errno));
                 return EXIT_FAILURE;
             }
+#else
+			if (CreateDirectory(g_conf._temppath, NULL) == 0) {
+				logmsg(LOG_ERROR, "tfs_mkdir - unable to create temporary directory [%s]!", g_conf._temppath);
+				return EXIT_FAILURE;
+			}
+#endif
             logmsg(LOG_DEBUG, "tfs_mkdir - created temporary directory: [%s]", g_conf._temppath);
         } else {
             logmsg(LOG_ERROR, "tfs_mkdir - unable to check if temporary directory [%s] exists. %d - %s", g_conf._temppath, errno, strerror(errno));

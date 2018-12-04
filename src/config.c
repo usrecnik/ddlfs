@@ -4,7 +4,11 @@
 #include <string.h>
 #include <fuse.h>
 #include <sys/types.h>
-#include <unistd.h>
+#ifndef _MSC_VER
+	#include <unistd.h>
+#else
+	#pragma warning(disable:4996)
+#endif
 
 #include "logging.h"
 #include "config.h"
@@ -48,6 +52,11 @@ static int ddlfs_opts_proc(void *data, const char *arg, int key, struct fuse_arg
                 , outargs->argv[0]);
             exit(1);
     }
+
+	// to keep compiler quiet about unused data & arg params
+	if (data == NULL || arg == NULL)
+		fprintf(stderr, " ");
+	
     return 1;
 }
 
@@ -110,10 +119,19 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
 
     if (g_conf.temppath == NULL) {
         g_conf.temppath = calloc(10, sizeof(char));
+#ifdef _MSC_VER
+		strcpy(g_conf.temppath, "C:\\tmp\\");
+#else
         strcpy(g_conf.temppath, "/tmp");
+#endif
     }
 
+#ifdef _MSC_VER
+	g_conf._mount_pid = GetCurrentProcessId();
+#else
     g_conf._mount_pid = getpid();
+#endif
+
     g_conf._mount_stamp = time(NULL);
 
     logmsg(LOG_DEBUG, "Parameters:");

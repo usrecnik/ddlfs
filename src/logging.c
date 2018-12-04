@@ -1,11 +1,18 @@
-__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+#ifdef __linux__
+	__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+#endif
 
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <time.h>
-#include <syslog.h>
+#ifndef  _MSC_VER
+	#include <syslog.h>
+#else
+	#pragma warning(disable:4996) // Disable warnings like: "This function or variable may be unsafe. Consider using sscanf_s instead."
+#endif
+
 
 #include "logging.h"
 #include "config.h"
@@ -67,9 +74,11 @@ void logmsg(int level, const char *msg, ...) {
         va_end(args);
         va_start(args, msg);
         
+#ifndef _MSC_VER // @todo - log to Windows Event log on Windows
         openlog("ddlfs", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
         vsyslog(LOG_ERR, msg, args);
         closelog();
+#endif
     }
 
     free(format);

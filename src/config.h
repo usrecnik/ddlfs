@@ -21,7 +21,11 @@ struct s_global_config {
     char  *_temppath;
     int    _server_version;
     int    _isdba;
+#ifndef _MSC_VER
     pid_t  _mount_pid;
+#else
+	int _mount_pid;
+#endif
     time_t _mount_stamp;
 } g_conf;
 

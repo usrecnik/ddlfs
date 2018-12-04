@@ -2,6 +2,9 @@
 #include <string.h>
 #include <errno.h>
 #include <string.h>
+#ifdef _MSC_VER
+	#pragma warning(disable:4996)
+#endif
 
 #include "query_tables.h"
 #include "util.h"

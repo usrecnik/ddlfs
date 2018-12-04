@@ -2,6 +2,9 @@
 
 #include <stdio.h>
 #include <time.h>
+#ifdef _MSC_VER
+	#define pid_t int
+#endif
 
 /**
  * Methods related to management of temporary local cache files. Those

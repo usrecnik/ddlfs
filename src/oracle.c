@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _MSC_VER
+	#pragma warning(disable:4996)
+#endif
 
 #include "logging.h"
 #include "config.h"
@@ -129,7 +132,7 @@ int ora_connect(char* username, char* password, char* database) {
             g_connection.srv, 
             g_connection.err, 
             (text*) database, 
-            strlen(database),
+            (sb4) (strlen(database)),
             (ub4) OCI_DEFAULT);
     }
     
@@ -140,8 +143,8 @@ int ora_connect(char* username, char* password, char* database) {
     OCIAttrSet(g_connection.svc, OCI_HTYPE_SVCCTX, g_connection.srv, 0, OCI_ATTR_SERVER, g_connection.err);
 
     if (auth_type == OCI_CRED_RDBMS) {
-        OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, username, strlen(username), OCI_ATTR_USERNAME, g_connection.err); 
-        OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, password, strlen(password), OCI_ATTR_PASSWORD, g_connection.err);
+        OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, username, (sb4) (strlen(username)), OCI_ATTR_USERNAME, g_connection.err); 
+        OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, password, (sb4) (strlen(password)), OCI_ATTR_PASSWORD, g_connection.err);
     }
 
     logmsg(LOG_DEBUG, ".. starting [%s] database session.", (g_conf.userrole == NULL ? "default" : g_conf.userrole));
@@ -223,7 +226,7 @@ sword ora_stmt_prepare(OCIStmt **stm, const char *query) {
     if (ora_check(r))
         return r;
 
-    r = OCIStmtPrepare(*stm, g_connection.err, (text*) query, strlen(query), OCI_NTV_SYNTAX, OCI_DEFAULT);
+    r = OCIStmtPrepare(*stm, g_connection.err, (text*) query, (sb4) strlen(query), OCI_NTV_SYNTAX, OCI_DEFAULT);
     if (ora_check(r))
         return r;
     

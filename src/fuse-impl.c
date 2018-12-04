@@ -2,13 +2,14 @@
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
 
-__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+#ifdef __linux__ 
+	__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+#endif
 
 #include <fuse.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <time.h>
 #include <string.h>
@@ -16,6 +17,16 @@ __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 #include <stddef.h>
 #include <errno.h>
 #include <ctype.h>
+#ifndef _MSC_VER
+	#include <unistd.h>
+#else
+	#pragma warning(disable:4996)
+	#pragma warning(disable:4100) //  unreferenced formal parameter (because function signature is from libfuse, we shouldn't change it)
+	#define getuid() 0 // @todo - i'm not really sure what to give here for windows...
+	#define getgid() 0 // @todo - i'm not really sure what to give here for windows since struct stat st_uid is of type "short"
+	#include <io.h>
+	#define F_OK    0
+#endif
 
 #include "vfs.h"
 #include "logging.h"
@@ -23,6 +34,7 @@ __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 #include "config.h"
 #include "tempfs.h"
 #include "fuse-impl.h"
+#include "util.h"
 
 #define DEPTH_SCHEMA 0
 #define DEPTH_TYPE   1
@@ -109,7 +121,12 @@ static int qry_dbro_cache(char **path, t_fsentry *type) {
             return EXIT_FAILURE;
         }
 
+#ifdef _MSC_VER
+		char ftype = 'F';
+#else
         char ftype = ((file_stat.st_mode & S_IXUSR) ? 'F' : 'I');
+#endif
+
         // load vfs from cache
         t_fsentry *entry = vfs_entry_create(
             ftype, // F=valid (execution bit set), I=invalid
@@ -128,7 +145,7 @@ static int qry_dbro_cache(char **path, t_fsentry *type) {
 }
 
 // return NULL if file not found
-static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFound) {
+static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
     if (path[0] == NULL) {
         qry_any(0, NULL, NULL);
         return g_vfs;
@@ -140,8 +157,21 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
         if (suffix == NULL)
             return NULL;
 
+#ifdef _MSC_VER
+		char *suffix_upper = strdup(suffix);
+		if (suffix_upper == NULL)
+			return NULL;
+		for (size_t i = 0; i < strlen(suffix_upper); i++)
+			suffix_upper[i] = (char) toupper(suffix_upper[i]);
+		if (strcmp(suffix_upper, ".JAVA") != 0 && strcmp(suffix_upper, ".SQL") != 0) {
+			free(suffix_upper);
+			return NULL;
+		}
+		free(suffix_upper);
+#else
         if (strcasecmp(suffix, ".JAVA") != 0 && strcasecmp(suffix, ".SQL") != 0)
             return NULL;
+#endif
     }
 
     if (path[DEPTH_TYPE] != NULL) {
@@ -208,21 +238,29 @@ static t_fsentry* fs_vfs_by_path(const char *raw_path, char **path, int loadFoun
     return entries[DEPTH_MAX-1];
 }
 
-int fs_getattr( const char *path, struct stat *st )
+#ifdef _MSC_VER
+int fs_getattr(const char *path, struct FUSE_STAT *st /*,  struct fuse_file_info *fi*/)
+#else
+int fs_getattr(const char *path, struct stat *st )
+#endif
 {
     char **part;
     int depth = fs_path_create(&part, path);
-    t_fsentry *entry = fs_vfs_by_path(path, part, 0);
+    t_fsentry *entry = fs_vfs_by_path(part, 0);
 
     if (strcmp(path, "/ddlfs.log") == 0) {
         st->st_uid = getuid();
         st->st_gid = getgid();
+        
+        #ifndef _MSC_VER
         st->st_atime = g_ddl_log_time;
         st->st_mtime = g_ddl_log_time;
         st->st_ctime = g_ddl_log_time;
+        #endif
+
         st->st_nlink = 1;
         st->st_mode = S_IFREG | 0444;
-        st->st_size = (g_ddl_log_buf == NULL ? 0 : g_ddl_log_len);
+        st->st_size = (off_t) (g_ddl_log_buf == NULL ? 0 : g_ddl_log_len);
         fs_path_free(part);
         return 0;
     }
@@ -247,10 +285,15 @@ int fs_getattr( const char *path, struct stat *st )
 
     st->st_uid = getuid();
     st->st_gid = getgid();
+#ifndef _MSC_VER
     st->st_blocks = 1;
+#endif
+
+#ifndef _MSC_VER        
     st->st_atime = entry->modified;
     st->st_mtime = entry->modified; // /* Time of last modification */
     st->st_ctime = entry->modified; // /* Time of last status change */
+#endif
 
     if (entry->ftype == 'D') {
         st->st_nlink = 2;
@@ -280,17 +323,26 @@ int fs_getattr( const char *path, struct stat *st )
     return 0;
 }
 
-int fs_readdir(const char *path,
-               void *buffer,
+#ifdef _MSC_VER
+int fs_readdir(const char *path, 
+               void *buffer, 
                fuse_fill_dir_t filler,
-               off_t offset,
-               struct fuse_file_info *fi) {
-
+               FUSE_OFF_T offset, //off_t offset, 
+               struct fuse_file_info *fi
+               /*, enum fuse_readdir_flags flags */)
+#else
+int fs_readdir(const char *path,
+	           void *buffer,
+	           fuse_fill_dir_t filler,
+	           off_t offset,
+	           struct fuse_file_info *fi)
+#endif
+{   
     logmsg(LOG_DEBUG, "fuse-readdir: [%s]", path);
 
     char **part;
     fs_path_create(&part, path);
-    t_fsentry *entry = fs_vfs_by_path(path, part, 1);
+    t_fsentry *entry = fs_vfs_by_path(part, 1);
 
     if (entry == NULL) {
         logmsg(LOG_DEBUG, "File not found for path [%s]", path);
@@ -304,6 +356,7 @@ int fs_readdir(const char *path,
         filler(buffer, entry->children[i]->fname, NULL, 0);
 
     fs_path_free(part);
+    
     return 0;
 }
 
@@ -369,7 +422,7 @@ int fs_open(const char *path,
     return 0;
 }
 
-static int fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+static size_t fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     if (g_ddl_log_buf == NULL)
         return 0;
 
@@ -398,12 +451,12 @@ int fs_read(const char *path,
     int res;
 
     if (strcmp(path, "/ddlfs.log") == 0)
-        return fs_read_ddl_log(buf, size, offset, fi);
+        return (int) fs_read_ddl_log(buf, size, offset, fi);
 
     if (fi == NULL)
         fd = fake_open(path, NULL);
     else
-        fd = fi->fh;
+        fd = (int) fi->fh;
 
     if (fd < 0) {
         logmsg(LOG_ERROR, "fuse-read failed, fd is negative (%d)", fd);
@@ -426,7 +479,7 @@ int fs_write(const char *path,
              off_t offset,
              struct fuse_file_info *fi) {
     logmsg(LOG_INFO, "fuse-write: [%s]", path);
-    int res = pwrite(fi->fh, buf, size, offset);
+    int res = pwrite((int) fi->fh, buf, size, offset);
     if (res == -1)
         return -errno;
     return res;
@@ -459,7 +512,7 @@ int fs_release(const char *path,
     int is_table_source = (strcmp(part[DEPTH_TYPE], "TABLE") == 0 ? 1 : 0);
     int is_mview_source = (strcmp(part[DEPTH_TYPE], "MATERIALIZED_VIEW") == 0 ? 1 : 0);
 
-    if (close(fi->fh) != 0) {
+    if (close((int) fi->fh) != 0) {
         // closing also flushes metadata, such as mtime
         logmsg(LOG_DEBUG, "Unable to close underlying file (%s), error=%d", fname, errno);
         fs_path_free(part);
@@ -585,7 +638,7 @@ int fs_create (const char *path,
     logmsg(LOG_INFO, "fs_create() - [%s]", path);
 
 
-    if (fs_getattr(path, &st) == -ENOENT) {
+    ////////// @todo: this should not be commented: if (fs_getattr(path, &st) == -ENOENT) {
         logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
 
         depth = fs_path_create(&part, path);
@@ -649,7 +702,7 @@ int fs_create (const char *path,
         qry_exec_ddl(object_schema, object_name, empty_ddl);
 
         fs_path_free(part);
-    }
+    //////////////////////////////// }
 
     if (object_type != NULL)
         free(object_type);
@@ -679,12 +732,16 @@ int fs_truncate(const char *path,
     }
 
     qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
-    if (truncate(fname, 0) == -1) {
+   
+	int tmpfd = open(fname, O_TRUNC | O_WRONLY);
+	if (tmpfd == -1) {
+		// if (truncate(fname, 0) == -1) { // this is unix-only function, thus replaced by open(fname, O_TRUNC)
         logmsg(LOG_ERROR, "fs_truncate() - unable to truncate [%s], errno=[%d]", fname, errno);
         fs_path_free(part);
         free(fname);
         return -errno;
     }
+	close(tmpfd);
 
     fs_path_free(part);
     free(fname);

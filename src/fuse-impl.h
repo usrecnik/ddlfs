@@ -1,11 +1,25 @@
 #pragma once
 
-int fs_getattr(const char *path, struct stat *st);
+#ifdef _MSC_VER
+int fs_getattr(const char *path, struct FUSE_STAT *st /*,  struct fuse_file_info *fi*/);
+#else
+int fs_getattr(const char *path, struct stat *st /*,  struct fuse_file_info *fi*/);
+#endif
 
+#ifdef _MSC_VER
 int fs_readdir(const char *path, 
-			   void *buffer, fuse_fill_dir_t filler, 
-			   off_t offset, 
-			   struct fuse_file_info *fi);
+               void *buffer, 
+               fuse_fill_dir_t filler,
+               FUSE_OFF_T offset, //off_t offset, 
+               struct fuse_file_info *fi
+               /*, enum fuse_readdir_flags flags */);
+#else
+int fs_readdir(const char *path,
+	           void *buffer,
+	           fuse_fill_dir_t filler,
+	           off_t offset,
+	           struct fuse_file_info *fi);
+#endif
 
 int fs_read(const char *path, 
 			char *buffer, 

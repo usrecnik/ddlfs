@@ -1,6 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN64
+	#include <SYS\TYPES.H>
+	#define strdup _strdup
+#endif
+
 #include "vfs.h"
 #include "logging.h"
 

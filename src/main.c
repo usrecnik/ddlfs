@@ -4,13 +4,15 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <signal.h>
+#ifndef _MSC_VER
+	#include <unistd.h>
+#endif
 
 #include "logging.h"
 #include "config.h"
@@ -21,15 +23,18 @@
 #include "tempfs.h"
 #include "dbro_refresh.h"
 
-#define DDLFS_VERSION "2.3"
+
+#define DDLFS_VERSION "2.4"
 
 void sigusr1_handler(int signo) {
     logmsg(LOG_INFO, " ");
     logmsg(LOG_INFO, "Received signal %d", signo);
-    if (signo == SIGUSR1) {
+#ifndef _MSC_VER
+	if (signo == SIGUSR1) {
         vfs_dump(g_vfs, 0);
     }
-    logmsg(LOG_INFO, "Singal handled");
+#endif
+    logmsg(LOG_INFO, "Signal handled");
 }
 
 int main(int argc, char *argv[]) {
@@ -41,14 +46,22 @@ int main(int argc, char *argv[]) {
     logmsg(LOG_INFO, "DDL Filesystem v%s for Oracle Database, FUSE v%d.%d", DDLFS_VERSION, FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
 
     g_vfs_last_schema = NULL;
+#ifdef _MSC_VER
+	g_conf.mountpoint = argv[argc-1];
+#else
     g_conf.mountpoint = realpath(argv[argc-1], NULL);
-    logmsg(LOG_DEBUG, ".. mounting at [%s]", g_conf.mountpoint);
+#endif
+
+	logmsg(LOG_DEBUG, ".. mounting at [%s]", g_conf.mountpoint);
 
     logmsg(LOG_DEBUG, " ");
     logmsg(LOG_DEBUG, "-> mount <-");
 
+#ifndef _MSC_VER
+	// this is Linux only feature
     if (signal(SIGUSR1, sigusr1_handler) == SIG_ERR)
         logmsg(LOG_ERROR, "Unable to register SIGUSR1 signal handler");
+#endif
 
     struct fuse_args args = parse_arguments(argc, argv);
     if (args.argc == -1) {
@@ -62,13 +75,13 @@ int main(int argc, char *argv[]) {
     struct fuse_operations oper = {
         .getattr  = fs_getattr,
         .readdir  = fs_readdir,
-        .read     = fs_read,
-        .write    = fs_write,
-        .open     = fs_open,
-        .create   = fs_create,
-        .truncate = fs_truncate,
-        .release  = fs_release,
-        .unlink   = fs_unlink
+        //.read     = fs_read,
+        //.write    = fs_write,
+        //.open     = fs_open,
+        //.create   = fs_create,
+        //.truncate = fs_truncate,
+        //.release  = fs_release,
+        //.unlink   = fs_unlink
     };
 
     if (ora_connect(g_conf.username, g_conf.password, g_conf.database) != EXIT_SUCCESS) {

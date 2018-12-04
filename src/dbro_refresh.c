@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <dirent.h>
 #include <errno.h>
 #include <string.h>
-
-#include <unistd.h>
 #include <fcntl.h>           /* Definition of AT_* constants */
+#ifndef _MSC_VER
+	#include <unistd.h>
+	#include <dirent.h>
+#else
+	#pragma warning(disable:4996)
+#endif
 
 #include "logging.h"
 #include "config.h"
@@ -77,6 +80,10 @@ static int dbr_refresh_object(const char *schema,
 }
 
 static int dbr_delete_obsolete() {
+#ifdef _MSC_VER
+	logmsg(LOG_ERROR, "dbr_delete_obsolete() - this function is not yet implemented for Windows platform!");
+	return EXIT_FAILURE;
+#else
     char cache_fn[4096];
     DIR *dir = opendir(g_conf._temppath);
 
@@ -90,7 +97,7 @@ static int dbr_delete_obsolete() {
         if (dir_entry->d_type != DT_REG)
             continue;
 
-        int name_len = strlen(dir_entry->d_name);
+        size_t name_len = strlen(dir_entry->d_name);
         if (name_len < 5)
             continue;
 
@@ -117,6 +124,7 @@ static int dbr_delete_obsolete() {
     closedir(dir);
 
     return EXIT_SUCCESS;
+#endif
 }
 
 int dbr_refresh_cache() {

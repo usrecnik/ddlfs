@@ -90,7 +90,7 @@ int ora_get_open_mode();
                                                     }
 
 #define ORA_STMT_BIND_STR(PROC, I, NAME)            OCIBind *o_bn##I = NULL;\
-                                                    if (ora_stmt_bind(o_stm, &o_bn##I, I, (void*) NAME, strlen(NAME)+1, SQLT_STR)) {\
+                                                    if (ora_stmt_bind(o_stm, &o_bn##I, I, (void*) NAME, (sb4) (strlen(NAME)+1), SQLT_STR)) {\
                                                         logmsg(LOG_ERROR, "%s(): Unable to bind %d", #PROC, #NAME);\
                                                         retval = EXIT_FAILURE;\
                                                         goto PROC##_cleanup;\

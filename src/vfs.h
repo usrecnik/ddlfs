@@ -11,7 +11,7 @@ typedef struct s_fsentry {
     struct  s_fsentry **children;
 	int 	capacity;
 	int 	count;
-	int     allocated; // for debugging
+	int     allocated;
 } t_fsentry;
 
 t_fsentry *g_vfs;

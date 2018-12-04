@@ -15,7 +15,7 @@
 
 char *g_ddl_log_buf;   // contents of in-memory "ddlfs.log"
 time_t g_ddl_log_time; // time when the contents last changed
-long g_ddl_log_len;
+size_t g_ddl_log_len;
 
 
 // log message to stdout/stderr
