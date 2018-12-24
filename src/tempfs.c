@@ -205,7 +205,7 @@ int tfs_rmfile(const char *cache_fn) {
  * @return EXIT_SUCCESS: file is up2date, EXIT_FAILURE: file is outdated
  * */
 int tfs_quick_validate(const char *path) {
-
+logmsg(LOG_DEBUG, "URHDBG 1.1.1");
     char *meta_fn = NULL;
     if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to determine meta file for cache file [%s]", path);
@@ -219,7 +219,7 @@ int tfs_quick_validate(const char *path) {
         free(meta_fn);
         return EXIT_FAILURE;
     }
-
+logmsg(LOG_DEBUG, "URHDBG 1.1.2");
     time_t last_ddl_time = 0;
     pid_t mount_pid = 0;
     time_t mount_stamp = 0;
@@ -235,14 +235,17 @@ int tfs_quick_validate(const char *path) {
         free(meta_fn);
         return EXIT_SUCCESS;
     }
-
+logmsg(LOG_DEBUG, "URHDBG 1.1.3");
     free(meta_fn);
+logmsg(LOG_DEBUG, "URHDBG 1.1.4");
     return EXIT_FAILURE;
 }
 
 int tfs_validate2(const char *cache_fn, time_t last_ddl_time) {
-    time_t cached_time = 0;
+logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 1");
+logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 1, cache_fn=[%s]", cache_fn);
 
+    time_t cached_time = 0;
     // check if tempfile already exist and has atime equal to last_modified_time.
     // there is no need to recreate tempfile if times (atime & last_modified_time) match.
     if (access(cache_fn, F_OK) == -1 ) {
@@ -250,6 +253,7 @@ int tfs_validate2(const char *cache_fn, time_t last_ddl_time) {
         return EXIT_FAILURE;
     }
 
+logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 2");
     if (tfs_getldt(cache_fn, &cached_time, NULL, NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_validate - unable to read cached last_ddl_time for [%s]!", cache_fn);
         return EXIT_FAILURE;
@@ -259,7 +263,7 @@ int tfs_validate2(const char *cache_fn, time_t last_ddl_time) {
         logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is already up2date.", cache_fn);
         return EXIT_SUCCESS;
     }
-
+logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 3");
     logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is outdated.", cache_fn);
     return EXIT_FAILURE;
 }
@@ -339,7 +343,7 @@ int tfs_rmdir(int ignoreNoDir) {
 		if (strcmp(file.cFileName, "..") == 0)
 			continue;
 
-		sprintf(abs_path, "%s\\%s", g_conf._temppath, file.cFileName);
+		sprintf(abs_path, "%s%s%s", g_conf._temppath, PATH_SEP, file.cFileName);
 		if (!(file.dwFileAttributes &FILE_ATTRIBUTE_DIRECTORY)) {
 			if (!DeleteFileA(abs_path))
 				printf("tfs_rmdir - unable to delete file [%s]!", abs_path);
@@ -360,8 +364,9 @@ int tfs_mkdir() {
         return EXIT_FAILURE;
     }
 
-    snprintf(g_conf._temppath, 2047, "%s/ddlfs-%s.%s.%s.%s",
+    snprintf(g_conf._temppath, 2047, "%s%sddlfs-%s.%s.%s.%s",
         g_conf.temppath,
+        PATH_SEP,
         g_conf.database,
         (getenv("ORACLE_SID") == NULL ? "tns" : getenv("ORACLE_SID")),
         g_conf.username,

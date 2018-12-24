@@ -2,6 +2,12 @@
 #include <sys/types.h>
 #include <time.h>
 
+#ifdef _MSC_VER
+    #define PATH_SEP "\\"
+#else
+    #define PATH_SEP "/"
+#endif
+
 /**
  * Convert string (formatted as 'yyyy-mm-dd hh24:mi:ss') to time_t
  * */

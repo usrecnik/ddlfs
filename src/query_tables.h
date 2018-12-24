@@ -1,3 +1,5 @@
+#pragma once
+
 struct deflist {
     char *definition; 
     struct deflist *next;

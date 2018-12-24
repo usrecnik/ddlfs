@@ -238,11 +238,9 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
     return entries[DEPTH_MAX-1];
 }
 
-#ifdef _MSC_VER
-int fs_getattr(const char *path, struct FUSE_STAT *st /*,  struct fuse_file_info *fi*/)
-#else
-int fs_getattr(const char *path, struct stat *st )
-#endif
+int fs_getattr(	const char *path, 
+				DDLFS_STRUCT_STAT *st
+				/*,  struct fuse_file_info *fi*/)
 {
     char **part;
     int depth = fs_path_create(&part, path);
@@ -283,13 +281,22 @@ int fs_getattr(const char *path, struct stat *st )
         free(fname);
     }
 
+#ifndef _MSC_VER
     st->st_uid = getuid();
     st->st_gid = getgid();
-#ifndef _MSC_VER
     st->st_blocks = 1;
 #endif
 
-#ifndef _MSC_VER        
+#ifdef _MSC_VER
+    // convert from 'time_t' to 'timestruc_t'
+    struct timespec tmp;
+    tmp.tv_sec = entry->modified;
+    tmp.tv_nsec = 0;
+
+    st->st_atim = tmp;
+    st->st_mtim = tmp; // /* Time of last modification */
+    st->st_ctim = tmp; // /* Time of last status change */
+#else _MSC_VER        
     st->st_atime = entry->modified;
     st->st_mtime = entry->modified; // /* Time of last modification */
     st->st_ctime = entry->modified; // /* Time of last status change */
@@ -323,21 +330,13 @@ int fs_getattr(const char *path, struct stat *st )
     return 0;
 }
 
-#ifdef _MSC_VER
-int fs_readdir(const char *path, 
-               void *buffer, 
-               fuse_fill_dir_t filler,
-               FUSE_OFF_T offset, //off_t offset, 
-               struct fuse_file_info *fi
-               /*, enum fuse_readdir_flags flags */)
-#else
-int fs_readdir(const char *path,
-	           void *buffer,
-	           fuse_fill_dir_t filler,
-	           off_t offset,
-	           struct fuse_file_info *fi)
-#endif
-{   
+int fs_readdir(	const char *path, 
+               	void *buffer, 
+               	fuse_fill_dir_t filler,
+				off_t offset, 
+               	struct fuse_file_info *fi
+               	/*, enum fuse_readdir_flags flags */)
+{
     logmsg(LOG_DEBUG, "fuse-readdir: [%s]", path);
 
     char **part;
@@ -372,6 +371,7 @@ static int fake_open(const char *path,
         fs_path_free(part);
         return -1;
     }
+
     char *fname = NULL;
     if (qry_object(part[0], part[1], part[2], &fname) != EXIT_SUCCESS) {
         if (fname != NULL)
@@ -379,13 +379,13 @@ static int fake_open(const char *path,
         fs_path_free(part);
         return -1;
     }
-
+    
     int fh;
     if (fi != NULL)
         fh = open(fname, O_RDWR);
     else
         fh = open(fname, O_RDONLY);
-
+    
     if (fh < 0) {
         logmsg(LOG_ERROR, "Unable to open [%s] for passthrough (%d)",
             fname, errno);
@@ -398,6 +398,9 @@ static int fake_open(const char *path,
     if (fname != NULL)
         free(fname);
     fs_path_free(part);
+
+urhdbg("fake open completed");
+
     return fh;
 }
 
@@ -419,6 +422,7 @@ int fs_open(const char *path,
     fi->direct_io = 1;
     fi->fh = fh;
 
+    logmsg(LOG_DEBUG, "URHDBG: fuse-open returning 0");
     return 0;
 }
 
@@ -427,7 +431,7 @@ static size_t fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_
         return 0;
 
     size_t len = strlen(g_ddl_log_buf);
-    if (offset >= len)
+    if ((int) offset >= (int) len)
         return 0;
 
     if (offset + size > len) {
@@ -439,19 +443,24 @@ static size_t fs_read_ddl_log(char *buf, size_t size, off_t offset, struct fuse_
     return size;
 }
 
-int fs_read(const char *path,
-            char *buf,
-            size_t size,
-            off_t offset,
-            struct fuse_file_info *fi) {
+int fs_read(const char *path, 
+			char *buffer, 
+			size_t size, 
+			off_t offset, 
+			struct fuse_file_info *fi)
+{
 
     logmsg(LOG_DEBUG, "fuse-read: [%s], offset=[%d]", path, offset);
 
     int fd;
     int res;
 
+#ifdef _MSC_VER
     if (strcmp(path, "/ddlfs.log") == 0)
-        return (int) fs_read_ddl_log(buf, size, offset, fi);
+#else
+    if (strcmp(path, "\\ddlfs.log") == 0)
+#endif
+        return (int) fs_read_ddl_log(buffer, size, offset, fi);
 
     if (fi == NULL)
         fd = fake_open(path, NULL);
@@ -463,9 +472,11 @@ int fs_read(const char *path,
         return -ENOENT;
     }
 
-    res = pread(fd, buf, size, offset);
-    if (res == -1)
+    res = pread(fd, buffer, size, offset);
+    if (res == -1) {
+        logmsg(LOG_ERROR, "pread returned error.");
         res = -errno;
+    }
 
     if (fi == NULL )
         close(fd);
@@ -628,7 +639,7 @@ int fs_create (const char *path,
                mode_t mode,
                struct fuse_file_info *fi) {
 
-    struct stat st;
+    DDLFS_STRUCT_STAT st;
     char **part;
     int depth;
     char *object_type = NULL;
@@ -638,7 +649,7 @@ int fs_create (const char *path,
     logmsg(LOG_INFO, "fs_create() - [%s]", path);
 
 
-    ////////// @todo: this should not be commented: if (fs_getattr(path, &st) == -ENOENT) {
+    if (fs_getattr(path, &st) == -ENOENT) {
         logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
 
         depth = fs_path_create(&part, path);
@@ -702,7 +713,7 @@ int fs_create (const char *path,
         qry_exec_ddl(object_schema, object_name, empty_ddl);
 
         fs_path_free(part);
-    //////////////////////////////// }
+    }
 
     if (object_type != NULL)
         free(object_type);

@@ -75,13 +75,13 @@ int main(int argc, char *argv[]) {
     struct fuse_operations oper = {
         .getattr  = fs_getattr,
         .readdir  = fs_readdir,
-        //.read     = fs_read,
-        //.write    = fs_write,
-        //.open     = fs_open,
-        //.create   = fs_create,
-        //.truncate = fs_truncate,
-        //.release  = fs_release,
-        //.unlink   = fs_unlink
+        .read     = fs_read,
+        .write    = fs_write,
+        .open     = fs_open,
+        .create   = fs_create,
+        .truncate = fs_truncate,
+        .release  = fs_release,
+        .unlink   = fs_unlink
     };
 
     if (ora_connect(g_conf.username, g_conf.password, g_conf.database) != EXIT_SUCCESS) {

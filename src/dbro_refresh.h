@@ -1,3 +1,4 @@
+#pragma once
 
 /**
  * This is called once while mounting the filesystem. It is only called

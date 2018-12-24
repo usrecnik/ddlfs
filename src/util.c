@@ -128,37 +128,6 @@ int strcasecmp(const char *s1, const char *s2) {
 	}
 	return 0;
 }
-/*
-BOOL ReadFile(
-  HANDLE       hFile,
-  LPVOID       lpBuffer,
-  DWORD        nNumberOfBytesToRead,
-  LPDWORD      lpNumberOfBytesRead,
-  LPOVERLAPPED lpOverlapped
-);
-
-A 32-bit unsigned integer. The range is 0 through 4294967295 decimal.
-This type is declared in IntSafe.h as follows:
-typedef unsigned long DWORD;
-
-
-	LPDWORD: A pointer to a DWORD.
-	DWORD:	 A 32-bit unsigned integer.
-
-	typedef struct _OVERLAPPED {
-		ULONG_PTR Internal;
-		ULONG_PTR InternalHigh;
-		union {
-			struct {
-				DWORD Offset;
-				DWORD OffsetHigh;
-			} DUMMYSTRUCTNAME;
-			PVOID Pointer;
-		} DUMMYUNIONNAME;
-		HANDLE    hEvent;
-	} OVERLAPPED, *LPOVERLAPPED;
-
-*/
 
 // https://docs.microsoft.com/sl-si/windows/desktop/Sync/synchronization-and-overlapped-input-and-output
 int pread(int fd, void *buf, size_t count, off_t offset) {
@@ -183,16 +152,7 @@ int pwrite(int fd, const void *buf, size_t count, off_t offset) {
 	OVERLAPPED overlapped;
 	memset(&overlapped, 0, sizeof(OVERLAPPED));
 	overlapped.Offset = (DWORD) offset;
-	/*
-	BOOL WriteFile(
-  HANDLE       hFile,
-  LPCVOID      lpBuffer,
-  DWORD        nNumberOfBytesToWrite,
-  LPDWORD      lpNumberOfBytesWritten,
-  LPOVERLAPPED lpOverlapped
-);
-	*/
-	
+    
 	if (!WriteFile(hFile, buf, (DWORD)count, &bytesWritten, &overlapped)) {
 		// @todo: should probably also set errno
 		return -1;
@@ -202,3 +162,9 @@ int pwrite(int fd, const void *buf, size_t count, off_t offset) {
 }
 
 #endif
+
+void urhdbg(char *msg) {
+    int ok = access("C:\\tmp\\ddlfs_nightfury_1521_XE.tns.SYSTEM._\\ddlfs-HR.PROCEDURE.ADD_JOB_HISTORY.SQL.tmp", 0);
+    logmsg(LOG_DEBUG, "URHDBG: %d, %s", ok, msg);
+
+}
