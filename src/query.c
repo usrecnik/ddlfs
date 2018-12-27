@@ -151,7 +151,7 @@ static int qry_object_all_source(const char *schema,
                                  const char *fname,
                                  const  int is_java_source,
                                  const  int is_trigger_source) {
-logmsg(LOG_DEBUG, "URHDBG - about to open file [%s]", fname);
+
     int is_view_source = ((strcmp(type, "VIEW") == 0) ? 1 : 0);
     int is_mview_source = ((strcmp(type, "MATERIALIZED VIEW") == 0) ? 1 : 0);
     int retval = EXIT_SUCCESS;
@@ -258,7 +258,6 @@ logmsg(LOG_DEBUG, "URHDBG - about to open file [%s]", fname);
                 retval = EXIT_FAILURE;
                 goto qry_object_all_source_cleanup;
             }
-            logmsg(LOG_DEBUG, "URHDBG - file [%s] opened for writing!", fname);
 
             if (!is_java_source && !is_trigger_source && !is_view_source && !is_mview_source) {
                 sprintf(tmpstr, "CREATE OR REPLACE%s %s \"%s\".", editionable, type, schema);
@@ -452,7 +451,7 @@ static int qry_last_ddl_time(const char *schema,
                              const char *type,
                              const char *object,
                              time_t *last_ddl_time /* out */) {
-logmsg(LOG_DEBUG, "URHDBG 1.5.1");
+
     const char *query_user =
 "select to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
  from all_objects where owner=:schema and object_type=:type and object_name=:name";
@@ -462,7 +461,7 @@ logmsg(LOG_DEBUG, "URHDBG 1.5.1");
  from sys.obj$ o\
  join sys.user$ u on u.user# = o.owner#\
  where u.name=:schema and o.type#=:type and o.name=:name";
-logmsg(LOG_DEBUG, "URHDBG 1.5.2");
+
     const char *query = (g_conf._isdba == 1 ? query_dba : query_user);
 
     int retval = EXIT_SUCCESS;
@@ -493,7 +492,7 @@ logmsg(LOG_DEBUG, "URHDBG 1.5.2");
     else {
         logmsg(LOG_ERROR, "qry_last_ddl_time(): Unsupported type [%s]!", type);
     }
-logmsg(LOG_DEBUG, "URHDBG 1.5.3");
+
     OCIBind *o_bn2;
     ORA_STMT_PREPARE(qry_last_ddl_time);
     ORA_STMT_DEFINE_STR(qry_last_ddl_time, 1, last_str_time, 30);
@@ -516,7 +515,6 @@ logmsg(LOG_DEBUG, "URHDBG 1.5.3");
         logmsg(LOG_ERROR, "Unable to obtain last_ddl_time for [%s].[%s] (%s) -> no such object in all_objects", schema, object, type);
         retval = EXIT_FAILURE;
     }
-logmsg(LOG_DEBUG, "URHDBG 1.5.4");
 
 qry_last_ddl_time_cleanup:
     ORA_STMT_FREE;
@@ -527,7 +525,7 @@ int qry_object(char *schema,
                char *type,
                char *object,
                char **fname) {
-logmsg(LOG_DEBUG, "URHDBG 1.0");
+
     int retval = EXIT_SUCCESS;
     char *object_schema = NULL;
     char *object_type = NULL;
@@ -536,7 +534,7 @@ logmsg(LOG_DEBUG, "URHDBG 1.0");
     int is_trigger_source = 0;
     struct utimbuf newtime;
     time_t last_ddl_time = 0;
-logmsg(LOG_DEBUG, "URHDBG 1.1");
+
     // determine fname
     if (qry_object_fname(schema, type, object, fname) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_object_all_source() - unable to determine filename, qry_object_fname() failed.");
@@ -590,7 +588,6 @@ logmsg(LOG_DEBUG, "URHDBG 1.1");
                 qry_object_all_tables(object_schema, object_name, *fname);
             } else {
                 qry_object_all_source(object_schema, object_type, object_name, *fname, is_java_source, is_trigger_source);
-                logmsg(LOG_DEBUG, "URHDBG 1.5.. wtf 2B DONE");
             }
         }
 

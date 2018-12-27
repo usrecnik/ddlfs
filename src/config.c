@@ -120,7 +120,11 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
     if (g_conf.temppath == NULL) {
         g_conf.temppath = calloc(10, sizeof(char));
 #ifdef _MSC_VER
-		strcpy(g_conf.temppath, "C:\\tmp\\");
+        char *wintmp = getenv("TEMP");
+        if (wintmp == NULL)
+		    strcpy(g_conf.temppath, "C:\\tmp\\");
+        else
+            strcpy(g_conf.temppath, wintmp);
 #else
         strcpy(g_conf.temppath, "/tmp");
 #endif

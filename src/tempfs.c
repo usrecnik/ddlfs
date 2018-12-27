@@ -205,7 +205,7 @@ int tfs_rmfile(const char *cache_fn) {
  * @return EXIT_SUCCESS: file is up2date, EXIT_FAILURE: file is outdated
  * */
 int tfs_quick_validate(const char *path) {
-logmsg(LOG_DEBUG, "URHDBG 1.1.1");
+
     char *meta_fn = NULL;
     if (tfs_getldt_fn(path, &meta_fn) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_setldf - unable to determine meta file for cache file [%s]", path);
@@ -219,7 +219,7 @@ logmsg(LOG_DEBUG, "URHDBG 1.1.1");
         free(meta_fn);
         return EXIT_FAILURE;
     }
-logmsg(LOG_DEBUG, "URHDBG 1.1.2");
+
     time_t last_ddl_time = 0;
     pid_t mount_pid = 0;
     time_t mount_stamp = 0;
@@ -235,15 +235,13 @@ logmsg(LOG_DEBUG, "URHDBG 1.1.2");
         free(meta_fn);
         return EXIT_SUCCESS;
     }
-logmsg(LOG_DEBUG, "URHDBG 1.1.3");
+
     free(meta_fn);
-logmsg(LOG_DEBUG, "URHDBG 1.1.4");
+
     return EXIT_FAILURE;
 }
 
 int tfs_validate2(const char *cache_fn, time_t last_ddl_time) {
-logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 1");
-logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 1, cache_fn=[%s]", cache_fn);
 
     time_t cached_time = 0;
     // check if tempfile already exist and has atime equal to last_modified_time.
@@ -253,7 +251,6 @@ logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 1, cache_fn=[%s]", cache_fn);
         return EXIT_FAILURE;
     }
 
-logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 2");
     if (tfs_getldt(cache_fn, &cached_time, NULL, NULL) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "tfs_validate - unable to read cached last_ddl_time for [%s]!", cache_fn);
         return EXIT_FAILURE;
@@ -263,7 +260,7 @@ logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 2");
         logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is already up2date.", cache_fn);
         return EXIT_SUCCESS;
     }
-logmsg(LOG_DEBUG, "URHDBG tfs_validate2 - 3");
+    
     logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is outdated.", cache_fn);
     return EXIT_FAILURE;
 }

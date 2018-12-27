@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE
 #define _DEFAULT_SOURCE
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -139,7 +140,13 @@ int pread(int fd, void *buf, size_t count, off_t offset) {
 	// overlapped.OffsetHigh = (DWORD)(offset >> 32); 
 
 	if (!ReadFile(hFile, buf, (DWORD)count, &bytesRead, &overlapped)) {
-		// @todo: should probably also set errno
+        DWORD error_code = GetLastError();
+        if (error_code = ERROR_HANDLE_EOF) { // 38: Reached the end of the file.
+            return 0;
+        }
+        
+        logmsg(LOG_ERROR, "ReadFile() failed with errorcode: %d", error_code);
+        errno = ENOENT; // this is incorrent, but cannot automatically map GetLastError() to errno. 
 		return -1;
 	}
 	
@@ -154,7 +161,9 @@ int pwrite(int fd, const void *buf, size_t count, off_t offset) {
 	overlapped.Offset = (DWORD) offset;
     
 	if (!WriteFile(hFile, buf, (DWORD)count, &bytesWritten, &overlapped)) {
-		// @todo: should probably also set errno
+        DWORD error_code = GetLastError();
+        logmsg(LOG_ERROR, "WriteFile() failed with errorcode: %d", error_code);
+		errno = ENOENT; // this is incorrect, but cannot automatically map GetLastError() to errno.
 		return -1;
 	}
 
@@ -162,9 +171,3 @@ int pwrite(int fd, const void *buf, size_t count, off_t offset) {
 }
 
 #endif
-
-void urhdbg(char *msg) {
-    int ok = access("C:\\tmp\\ddlfs_nightfury_1521_XE.tns.SYSTEM._\\ddlfs-HR.PROCEDURE.ADD_JOB_HISTORY.SQL.tmp", 0);
-    logmsg(LOG_DEBUG, "URHDBG: %d, %s", ok, msg);
-
-}

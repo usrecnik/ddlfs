@@ -26,6 +26,7 @@
 	#define getgid() 0 // @todo - i'm not really sure what to give here for windows since struct stat st_uid is of type "short"
 	#include <io.h>
 	#define F_OK    0
+    #define O_ACCMODE   (_O_RDONLY|_O_WRONLY|_O_RDWR)
 #endif
 
 #include "vfs.h"
@@ -399,8 +400,6 @@ static int fake_open(const char *path,
         free(fname);
     fs_path_free(part);
 
-urhdbg("fake open completed");
-
     return fh;
 }
 
@@ -412,7 +411,17 @@ int fs_open(const char *path,
         return 0;
     }
 
-    logmsg(LOG_INFO, "fuse-open: [%s]", path);
+    char flagmsg[30];
+    if ((fi->flags & O_ACCMODE) == O_RDONLY)
+        strcpy(flagmsg, "RDONLY");
+    else if ((fi->flags & O_ACCMODE) == O_WRONLY)
+        strcpy(flagmsg, "O_WRONLY");
+    else if ((fi->flags & O_ACCMODE) == O_RDWR)
+        strcpy(flagmsg, "O_RDWR");
+    else
+        strcpy(flagmsg, "none");
+
+    logmsg(LOG_INFO, "fuse-open: [%s], [%s]", path, flagmsg);
 
     int fh = fake_open(path, fi);
     if (fh < 0) {
@@ -421,8 +430,7 @@ int fs_open(const char *path,
     }
     fi->direct_io = 1;
     fi->fh = fh;
-
-    logmsg(LOG_DEBUG, "URHDBG: fuse-open returning 0");
+    logmsg(LOG_DEBUG, "URHDBG fs_open(): opened file handle [%d]", fi->fh);
     return 0;
 }
 
@@ -516,8 +524,7 @@ int fs_release(const char *path,
     logmsg(LOG_INFO, "fuse-release: [%s]", path);
 
     fs_path_create(&part, path);
-    qry_object_fname(
-        part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
+    qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
 
     int is_java_source = (strcmp(part[DEPTH_TYPE], "JAVA_SOURCE") == 0 ? 1 : 0);
     int is_table_source = (strcmp(part[DEPTH_TYPE], "TABLE") == 0 ? 1 : 0);
@@ -530,9 +537,11 @@ int fs_release(const char *path,
         free(fname);
         return -errno;
     }
+    logmsg(LOG_DEBUG, "URHDBG fs_release(): closed file handle [%d]", fi->fh);
 
     // read file to buffer
     if (fi->flags & O_RDWR || fi->flags & O_WRONLY) {
+        logmsg(LOG_DEBUG, "fs_release() - URHDBG: READING FILE TO BUFFER");
         if (stat(fname, &tmp_stat) != 0) {
             logmsg(LOG_ERROR, "fs_release() - fstat failed for [%s]", fname);
             retval = -1;
@@ -610,7 +619,7 @@ int fs_release(const char *path,
         // functionally it wold be ok)
 
         if ((cache_already_removed == 0) && (tfs_rmfile(fname) != EXIT_SUCCESS))
-            logmsg(LOG_ERROR, "fs_release - unable to remove cached file [%s]", fname);
+            logmsg(LOG_ERROR, "fs_release - unable to remove cached file [%s] fd=[%d]", fname, fd);
     }
 
 fs_release_final:
