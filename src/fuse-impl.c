@@ -430,7 +430,8 @@ int fs_open(const char *path,
     }
     fi->direct_io = 1;
     fi->fh = fh;
-    logmsg(LOG_DEBUG, "URHDBG fs_open(): opened file handle [%d]", fi->fh);
+
+    logmsg(LOG_DEBUG, "URHDBG fs_open(): opened file handle=[%d] for path=[%s]", fi->fh, path);
     return 0;
 }
 
@@ -539,7 +540,7 @@ int fs_release(const char *path,
     }
     logmsg(LOG_DEBUG, "URHDBG fs_release(): closed file handle [%d]", fi->fh);
 
-    // read file to buffer
+	// read file to buffer
     if (fi->flags & O_RDWR || fi->flags & O_WRONLY) {
         logmsg(LOG_DEBUG, "fs_release() - URHDBG: READING FILE TO BUFFER");
         if (stat(fname, &tmp_stat) != 0) {
@@ -612,6 +613,7 @@ int fs_release(const char *path,
         }
     }
 
+/* 
     // @todo - consider *never* deleting this file here (and delete all temp files on umount).
     if (g_conf.filesize != -1) {
         // delete temp file. g_conf.filesie=-1 means exact filesizes. deleting this file would
@@ -621,6 +623,7 @@ int fs_release(const char *path,
         if ((cache_already_removed == 0) && (tfs_rmfile(fname) != EXIT_SUCCESS))
             logmsg(LOG_ERROR, "fs_release - unable to remove cached file [%s] fd=[%d]", fname, fd);
     }
+*/
 
 fs_release_final:
 

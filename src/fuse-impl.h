@@ -44,4 +44,3 @@ int fs_truncate(const char *path,
                 /* @todo in newer fuse: struct fuse_file_info *fi*/);
  
 int fs_unlink(const char *path);
-
