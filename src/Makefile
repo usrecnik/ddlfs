@@ -6,11 +6,11 @@ windows:
 	
 	cl \
 	/I $(LD_LIBRARY_PATH)\sdk\include \
-	/I "C:\Program Files\Dokan\DokanLibrary-1.2.0\include" \
+	/I "C:\Program Files\Dokan\Dokan Library-1.2.1\include" \
 	/W4 /RTCcsu /c /Gs /GS \
 	main.c logging.c config.c fuse-impl.c query.c query_tables.c vfs.c oracle.c tempfs.c util.c dbro_refresh.c
 	
-	link /out:ddlfs.exe /LIBPATH:. /LIBPATH:$(LD_LIBRARY_PATH)\sdk\lib\msvc\ /LIBPATH:"C:\Program Files\Dokan\DokanLibrary-1.2.0\lib" oci.lib dokanfuse1.lib *.obj
+	link /out:ddlfs.exe /LIBPATH:. /LIBPATH:$(LD_LIBRARY_PATH)\sdk\lib\msvc\ /LIBPATH:"C:\Program Files\Dokan\Dokan Library-1.2.1\lib" oci.lib dokanfuse1.lib *.obj
 	del *.obj
 
 linux:

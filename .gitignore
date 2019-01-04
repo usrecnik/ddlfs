@@ -9,3 +9,6 @@ test/test_git/mnt/
 test/test_git/cache/
 test/test_git/.*
 *.swp
+src/.vs
+src/*.exe
+src/*.obj

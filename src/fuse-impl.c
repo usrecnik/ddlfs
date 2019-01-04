@@ -386,7 +386,7 @@ static int fake_open(const char *path,
         fh = open(fname, O_RDWR);
     else
         fh = open(fname, O_RDONLY);
-    
+	
     if (fh < 0) {
         logmsg(LOG_ERROR, "Unable to open [%s] for passthrough (%d)",
             fname, errno);
@@ -431,7 +431,6 @@ int fs_open(const char *path,
     fi->direct_io = 1;
     fi->fh = fh;
 
-    logmsg(LOG_DEBUG, "URHDBG fs_open(): opened file handle=[%d] for path=[%s]", fi->fh, path);
     return 0;
 }
 
@@ -538,12 +537,11 @@ int fs_release(const char *path,
         free(fname);
         return -errno;
     }
-    logmsg(LOG_DEBUG, "URHDBG fs_release(): closed file handle [%d]", fi->fh);
-
+		
 	// read file to buffer
     if (fi->flags & O_RDWR || fi->flags & O_WRONLY) {
-        logmsg(LOG_DEBUG, "fs_release() - URHDBG: READING FILE TO BUFFER");
-        if (stat(fname, &tmp_stat) != 0) {
+
+		if (stat(fname, &tmp_stat) != 0) {
             logmsg(LOG_ERROR, "fs_release() - fstat failed for [%s]", fname);
             retval = -1;
             goto fs_release_final;
@@ -741,9 +739,9 @@ int fs_create (const char *path,
 
 int fs_truncate(const char *path,
                 off_t size
-                /* struct fuse_file_info *fi - in newer fuse */) {
-    logmsg(LOG_INFO, "fs_truncate() - [%s]", path);
-
+                /* struct fuse_file_info *fi // only in new version of libfuse */) {
+    logmsg(LOG_INFO, "fs_truncate() - [%s] to [%d] bytes", path, size);
+	
     char **part;
     int depth = fs_path_create(&part, path);
     char *fname;
@@ -755,16 +753,33 @@ int fs_truncate(const char *path,
     }
 
     qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
-   
-	int tmpfd = open(fname, O_TRUNC | O_WRONLY);
-	if (tmpfd == -1) {
-		// if (truncate(fname, 0) == -1) { // this is unix-only function, thus replaced by open(fname, O_TRUNC)
-        logmsg(LOG_ERROR, "fs_truncate() - unable to truncate [%s], errno=[%d]", fname, errno);
-        fs_path_free(part);
-        free(fname);
-        return -errno;
-    }
-	close(tmpfd);
+	
+#ifdef _MSC_VER
+	int fd = open(fname, O_RDWR);
+	
+	if (fd < 0) {
+		logmsg(LOG_ERROR, "fs_truncate(), unable to open file descriptor for file to be truncated");
+		fs_path_free(part);
+		free(fname);
+		return -1;
+	}
+
+	if (_chsize(fd, size) == -1) {
+		logmsg(LOG_ERROR, "fs_truncate(), unable to call _chsize(%d, %d), ", fd, size);
+		fs_path_free(part);
+		free(fname);
+		return -1;
+	}
+
+	close(fd);
+#else
+	if (truncate(fname, size) == -1) {
+		logmsg(LOG_ERROR, "fs_truncate() - unable to truncate [%s], errno=[%d]", fname, errno);
+		fs_path_free(part);
+		free(fname);
+		return -errno;
+	}
+#endif
 
     fs_path_free(part);
     free(fname);
