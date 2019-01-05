@@ -83,7 +83,14 @@ ora_get_open_mode_cleanup:
 }
 
 int ora_connect(char* username, char* password, char* database) {
-    sword r;
+	sword r = 0;
+
+	g_connection.env = 0;
+	g_connection.err = 0;
+	g_connection.srv = 0;
+	g_connection.svc = 0;
+	g_connection.ses = 0;
+	g_connection.read_only = 0;
     
     // https://docs.oracle.com/cd/E11882_01/appdev.112/e10646/oci16rel001.htm#LNOCI17121
     ub4 auth_type = OCI_CRED_RDBMS;
@@ -105,7 +112,7 @@ int ora_connect(char* username, char* password, char* database) {
     logmsg(LOG_DEBUG, "Connecting to Oracle Database (%s)", database);
     
     if (auth_type == OCI_CRED_EXT)
-        logmsg(LOG_DEBUG, ".. using external authentiaction.");
+        logmsg(LOG_DEBUG, ".. using external authentication.");
 
     r = OCIEnvCreate(&g_connection.env, OCI_DEFAULT, 0, 0, 0, 0, 0, 0);
     if (ora_check(r) != OCI_SUCCESS)

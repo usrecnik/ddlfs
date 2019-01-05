@@ -12,3 +12,6 @@ test/test_git/.*
 src/.vs
 src/*.exe
 src/*.obj
+src/*.idb
+src/*.ilk
+src/*.pdb
