@@ -179,7 +179,7 @@ int ora_connect(char* username, char* password, char* database) {
     logmsg(LOG_DEBUG, ".. connected to server version [%s] [%d]", version_str, g_conf._server_version);
 
 
-    if (g_conf.pdb != NULL) {
+    if (g_conf.pdb != NULL && g_conf.pdb[0] != '\0') {
         OCIStmt *o_stm = NULL;
         char alter_session_sql[250];
         

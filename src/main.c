@@ -1,5 +1,4 @@
-//#define FUSE_USE_VERSION 29
-#define FUSE_USE_VERSION 33
+#define FUSE_USE_VERSION 29
 
 #include <fuse.h>
 #include <fcntl.h>
@@ -42,7 +41,13 @@ int main(int argc, char *argv[]) {
 
     memset(&g_conf, 0, sizeof(g_conf));
     g_conf.dbro = -1;
-    g_conf.loglevel = "INFO";
+	g_conf.loglevel = malloc(15 * sizeof(char));
+	if (g_conf.loglevel == NULL) {
+		logmsg(LOG_ERROR, "main(): unable to allocate memory for g_conf.loglevel");
+		return 1;
+	}
+	strcpy(g_conf.loglevel, "INFO");
+
     g_ddl_log_time = time(NULL);
 
     logmsg(LOG_INFO, "DDL Filesystem v%s for Oracle Database, FUSE v%d.%d", DDLFS_VERSION, FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
@@ -64,13 +69,13 @@ int main(int argc, char *argv[]) {
     if (signal(SIGUSR1, sigusr1_handler) == SIG_ERR)
         logmsg(LOG_ERROR, "Unable to register SIGUSR1 signal handler");
 #endif
-
+	
     struct fuse_args args = parse_arguments(argc, argv);
     if (args.argc == -1) {
         logmsg(LOG_ERROR, "Missing or invalid parameters [%d], exiting.", args.argc);
         return 1;
     }
-
+	
     // force single-threaded mode
     fuse_opt_add_arg(&args, "-s");
 
@@ -92,7 +97,7 @@ int main(int argc, char *argv[]) {
     }
 
     logmsg(LOG_DEBUG, "is_sysdba=[%d]", g_conf._isdba);
-
+	
     if (g_conf.dbro == -1) {
         if (g_conf._isdba == 1) {
             logmsg(LOG_DEBUG, "neither dbro nor dbrw parameter given, thus trying 'select open_mode from v$database'");

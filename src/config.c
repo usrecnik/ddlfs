@@ -71,9 +71,37 @@ static int mandatory_parameter(const char *value, const char *parameter) {
 struct fuse_args parse_arguments(int argc, char *argv[]) {
 
     g_conf.keepcache = -1;
+	
+	g_conf.mountpoint = calloc(1000, sizeof(char));
+	g_conf.temppath	= calloc(1000, sizeof(char));
+	g_conf.username = calloc(130, sizeof(char));
+	g_conf.password = calloc(130, sizeof(char));
+	g_conf.userrole = calloc(30, sizeof(char));
+	g_conf.database = calloc(300, sizeof(char));
+	g_conf.schemas = calloc(500, sizeof(char));
+	g_conf.pdb = calloc(130, sizeof(char));
+	g_conf.loglevel = calloc(15, sizeof(char));
+	g_conf._temppath = calloc(1000, sizeof(char));
+
+	
 
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-    fuse_opt_parse(&args, &g_conf, ddlfs_opts, ddlfs_opts_proc);
+	if (g_conf.mountpoint == NULL ||
+		g_conf.temppath == NULL ||
+		g_conf.username == NULL ||
+		g_conf.password == NULL ||
+		g_conf.userrole == NULL ||
+		g_conf.database == NULL ||
+		g_conf.schemas == NULL ||
+		g_conf.pdb == NULL ||
+		g_conf.loglevel == NULL ||
+		g_conf._temppath == NULL) {
+		
+		logmsg(LOG_ERROR, "Unable to allocate memory for configuration entries (g_conf).");
+		return args;
+	}
+
+	fuse_opt_parse(&args, &g_conf, ddlfs_opts, ddlfs_opts_proc);
 
     if (mandatory_parameter(g_conf.username, "username")) {
         args.argc = -1;
@@ -90,20 +118,16 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
         return args;
     }
 
-    if (g_conf.loglevel == NULL) {
-        g_conf.loglevel = calloc(15, sizeof(char));
+    if (g_conf.loglevel[0] == '\0')
         strcpy(g_conf.loglevel, "INFO");
-    }
 
-    if (g_conf.schemas == NULL) {
-        g_conf.schemas = calloc(10, sizeof(char));
+    if (g_conf.schemas[0] == '\0')
         strcpy(g_conf.schemas, "%");
-    }
 
     if (g_conf.keepcache == -1)
         g_conf.keepcache = 0;
 
-    if (g_conf.userrole != NULL) {
+    if (g_conf.userrole[0] != '\0') {
         if (strcmp(g_conf.userrole, "SYSDBA") != 0 && strcmp(g_conf.userrole, "SYSOPER") != 0) {
             logmsg(LOG_ERROR, "Parameter userrole can only have the value of 'SYSDBA' or 'SYSOPER' if it is set.");
             args.argc = -1;
