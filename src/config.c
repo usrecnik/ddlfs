@@ -82,9 +82,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
 	g_conf.pdb = calloc(130, sizeof(char));
 	g_conf.loglevel = calloc(15, sizeof(char));
 	g_conf._temppath = calloc(1000, sizeof(char));
-
 	
-
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	if (g_conf.mountpoint == NULL ||
 		g_conf.temppath == NULL ||
@@ -141,8 +139,7 @@ struct fuse_args parse_arguments(int argc, char *argv[]) {
         return args;
     }
 
-    if (g_conf.temppath == NULL) {
-        g_conf.temppath = calloc(10, sizeof(char));
+    if (g_conf.temppath == NULL || g_conf.temppath[0] == '\0') {
 #ifdef _MSC_VER
         char *wintmp = getenv("TEMP");
         if (wintmp == NULL)

@@ -154,7 +154,7 @@ int ora_connect(char* username, char* password, char* database) {
         OCIAttrSet(g_connection.ses, OCI_HTYPE_SESSION, password, (sb4) (strlen(password)), OCI_ATTR_PASSWORD, g_connection.err);
     }
 
-    logmsg(LOG_DEBUG, ".. starting [%s] database session.", (g_conf.userrole == NULL ? "default" : g_conf.userrole));
+    logmsg(LOG_DEBUG, ".. starting [%s] database session.", (g_conf.userrole[0] == '\0' ? "default" : g_conf.userrole));
     if (ora_check(OCISessionBegin (
         g_connection.svc, 
         g_connection.err, 
