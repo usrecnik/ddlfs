@@ -60,6 +60,12 @@ static int fs_path_create (char ***part, const char *path) {
     char *t = strtok(p, "/");
     int i = 0;
     while(t) {
+		if (i >= 3) {
+			logmsg(LOG_ERROR, "fs_path_create(), requested path with depth >= 3, such file cannot exist!");
+			free(p);
+			fs_path_free(r);
+			return -1;
+		}
         r[i] = strdup(t);
         t = strtok(NULL, "/");
         i++;
@@ -245,6 +251,9 @@ int fs_getattr(	const char *path,
 {
     char **part;
     int depth = fs_path_create(&part, path);
+	if (depth == -1)
+		return -ENOENT;
+
     t_fsentry *entry = fs_vfs_by_path(part, 0);
 
     if (strcmp(path, "/ddlfs.log") == 0) {
@@ -341,7 +350,10 @@ int fs_readdir(	const char *path,
     logmsg(LOG_DEBUG, "fuse-readdir: [%s]", path);
 
     char **part;
-    fs_path_create(&part, path);
+    int depth = fs_path_create(&part, path);
+	if (depth == -1)
+		return -ENOENT;
+
     t_fsentry *entry = fs_vfs_by_path(part, 1);
 
     if (entry == NULL) {
@@ -367,6 +379,9 @@ static int fake_open(const char *path,
     logmsg(LOG_DEBUG, "fake-open: [%s]", path);
     char **part;
     int depth = fs_path_create(&part, path);
+	if (depth == -1)
+		return -1;
+
     if (depth != DEPTH_MAX) {
         logmsg(LOG_ERROR, "Unable to open file at depth=%d (%s).", depth, path);
         fs_path_free(part);
@@ -523,7 +538,10 @@ int fs_release(const char *path,
 
     logmsg(LOG_INFO, "fuse-release: [%s]", path);
 
-    fs_path_create(&part, path);
+    int depth = fs_path_create(&part, path);
+	if (depth == -1)
+		return -ENOENT;
+
     qry_object_fname(part[DEPTH_SCHEMA], part[DEPTH_TYPE], part[DEPTH_OBJECT], &fname);
 
     int is_java_source = (strcmp(part[DEPTH_TYPE], "JAVA_SOURCE") == 0 ? 1 : 0);
@@ -663,6 +681,8 @@ int fs_create (const char *path,
         logmsg(LOG_INFO, "fs_create() - creating empty object for [%s]", path);
 
         depth = fs_path_create(&part, path);
+		if (depth == -1)
+			return -EINVAL;
 
         if (str_fn2obj(&object_type, part[DEPTH_TYPE], NULL) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "fs_create() - unable to convert object to file name");
@@ -742,9 +762,11 @@ int fs_truncate(const char *path,
                 /* struct fuse_file_info *fi // only in new version of libfuse */) {
     logmsg(LOG_INFO, "fs_truncate() - [%s] to [%d] bytes", path, size);
 	
+	char *fname;
     char **part;
     int depth = fs_path_create(&part, path);
-    char *fname;
+	if (depth == -1)
+		return -ENOENT;
 
     if (depth != DEPTH_MAX) {
         logmsg(LOG_ERROR, "fs_truncate() - you can only truncate files in depth 3 (sql files)");
@@ -788,15 +810,17 @@ int fs_truncate(const char *path,
 
 int fs_unlink(const char *path) {
     logmsg(LOG_INFO, "fs_unlink() - [%s]", path);
-
-    char **part;
-    int depth = fs_path_create(&part, path);
+	
     char drop_ddl[1024] = "";
     char *object_type = NULL;
     char *object_name = NULL;
     char *object_schema = NULL;
 
-
+	char **part;
+	int depth = fs_path_create(&part, path);
+	if (depth == -1)
+		return -ENOENT;
+	
     if (depth != 3) {
         logmsg(LOG_ERROR, "fs_unlink() - Cannot unlink objects which are not at level 3");
         fs_path_free(part);

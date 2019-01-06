@@ -141,10 +141,10 @@ int pread(int fd, void *buf, size_t count, off_t offset) {
 
 	if (!ReadFile(hFile, buf, (DWORD)count, &bytesRead, &overlapped)) {
         DWORD error_code = GetLastError();
-        if (error_code = ERROR_HANDLE_EOF) { // 38: Reached the end of the file.
+        if (error_code == ERROR_HANDLE_EOF) { // 38: Reached the end of the file.
             return 0;
         }
-        
+		
         logmsg(LOG_ERROR, "ReadFile() failed with errorcode: %d", error_code);
         errno = ENOENT; // this is incorrent, but cannot automatically map GetLastError() to errno. 
 		return -1;
