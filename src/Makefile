@@ -13,6 +13,15 @@ windows:
 	link /DEBUG:FULL /out:ddlfs.exe /LIBPATH:. /LIBPATH:$(LD_LIBRARY_PATH)\sdk\lib\msvc\ /LIBPATH:"C:\Program Files\Dokan\Dokan Library-1.2.1\lib" oci.lib dokanfuse1.lib *.obj
 	del *.obj
 
+	if not exist "..\target" mkdir ..\target
+	"C:\Program Files (x86)\WiX Toolset v3.11\bin\heat.exe" dir E:\urh\instantclient_18_3\ -gg -cg clientCG -ke -srd -dr InstantClient -platform x64 -sfrag -sreg -out ic.wxs
+	"C:\Program Files (x86)\WiX Toolset v3.11\bin\candle.exe" -arch x64 ic.wxs WindowsInstaller.wxs
+	"C:\Program Files (x86)\WiX Toolset v3.11\bin\light.exe"  WindowsInstaller.wixobj ic.wixobj -b E:\urh\instantclient_18_3\ -out ..\target\ddlfs.msi
+	del *.wixobj
+	del ic.wxs
+	del ..\target\ddlfs.wixpdb
+	
+
 linux:
 	@mkdir -p ../target
 	gcc main.c logging.c config.c fuse-impl.c query.c query_tables.c vfs.c \

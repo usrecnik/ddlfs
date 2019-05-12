@@ -15,3 +15,5 @@ src/*.obj
 src/*.idb
 src/*.ilk
 src/*.pdb
+src/ic.wxs
+.vs/

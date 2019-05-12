@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Product Id="0d2efacf-6bff-4000-9560-6f4ac96880b9" Name="ddlfs" Language="1033" Version="1.1.0.0" Manufacturer="Urh Srecnik" UpgradeCode="6f1d975e-c13e-4394-95e2-489add7f2ab3">
+		<Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" Platform="x64" />
+
+		<MajorUpgrade DowngradeErrorMessage="A newer version of ddlfs is already installed." />
+    <Media Id="1" Cabinet="ddlfs.cab" EmbedCab="yes" />
+  
+    <Feature Id="ProductFeature" Title="ddlfs" Level="1">
+			<ComponentGroupRef Id="ddlfsCG" />
+      <ComponentGroupRef Id="clientCG" />
+		</Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="ddlfs">
+          <Directory Id="InstantClient" Name="instant_client" />
+        </Directory>
+      </Directory>
+    </Directory>
+    
+	</Product>
+
+	<Fragment>
+		<ComponentGroup Id="ddlfsCG" Directory="INSTALLFOLDER">
+			<Component Id="ddlfs" Win64="yes" Guid="52348e67-0d16-4b65-9c88-7190ad8b056e">
+        <File Id="ddlfs.exe" Source="ddlfs.exe"/>
+			</Component>
+		</ComponentGroup>
+	</Fragment>
+</Wix>
