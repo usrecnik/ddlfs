@@ -1,7 +1,11 @@
-LD_LIBRARY_PATH=..\..\instantclient_18_3
+UNAME := $(shell uname)
+ifeq ($(UNAME), Windows)
+    LD_LIBRARY_PATH=..\..\instantclient_23_5
+else
+    LD_LIBRARY_PATH=../../instantclient_23_5
+endif
 
 windows:
-	
 	"C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 	
 	cl \
@@ -21,8 +25,8 @@ windows:
 	del ic.wxs
 	del ..\target\ddlfs.wixpdb
 	
-
 linux:
+	@echo LD_LIBRARY_PATH=${LD_LIBRARY_PATH}	
 	@mkdir -p ../target
 	gcc main.c logging.c config.c fuse-impl.c query.c query_tables.c vfs.c \
 		oracle.c tempfs.c util.c dbro_refresh.c \
