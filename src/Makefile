@@ -34,7 +34,7 @@ linux:
 		-L $(LD_LIBRARY_PATH) -lclntsh \
 		-g -o ../target/ddlfs \
 		-Wall -pedantic \
-		`pkg-config fuse --cflags --libs`
+		`pkg-config fuse3 --cflags --libs`
 
 release: all
 	./mkRelease.sh
