@@ -6,26 +6,34 @@
 	#define DDLFS_STRUCT_STAT struct stat
 #endif
 
-int fs_getattr(	const char *path, 
-				DDLFS_STRUCT_STAT *st
-#ifdef _MSC_VER
-				// not available in dokan
-#else
-				,struct fuse_file_info *fi
-#endif
-);
+int fs_getattr(const char *path,
+			   DDLFS_STRUCT_STAT *st);
 
-int fs_readdir(	const char *path, 
+int fs_getattr_v29(const char *path,
+				   DDLFS_STRUCT_STAT *st);
+
+int fs_getattr_v30(const char *path,
+				   DDLFS_STRUCT_STAT *st,
+				   struct fuse_file_info *fi);
+
+int fs_readdir(	const char *path,
                	void *buffer, 
                	fuse_fill_dir_t filler,
-				off_t offset, 
-               	struct fuse_file_info *fi
-#ifdef _MSC_VER
-				// not available in dokan
-#else
-               	,enum fuse_readdir_flags flags
-#endif
-);
+				off_t offset,
+               	struct fuse_file_info *fi);
+
+int fs_readdir_v29(const char *path,
+               	   void *buffer,
+               	   fuse_fill_dir_t filler,
+				   off_t offset,
+               	   struct fuse_file_info *fi);
+
+int fs_readdir_v30(const char *path,
+               	   void *buffer,
+               	   fuse_fill_dir_t filler,
+				   off_t offset,
+               	   struct fuse_file_info *fi,
+               	   enum fuse_readdir_flags flags);
 
 int fs_read(const char *path, 
 			char *buffer, 

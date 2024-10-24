@@ -110,7 +110,7 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
     ORA_STMT_BIND_STR(tab_all_tab_columns, 2, table);
     ORA_STMT_EXECUTE(tab_all_tab_columns, 0);
 
-    char definition[4096];                // buffer (on stack) in which to build column representation
+    char definition[8192];                // buffer (on stack) in which to build column representation
     char scale[100];
     struct deflist *col_start = NULL;     // always points to first column if there is at least one column present
     struct deflist *col_temp = NULL;      // temporary, points to any columns
@@ -149,7 +149,7 @@ static int tab_all_tab_columns(const char *schema, const char *table, struct tab
         }
 
         // default
-        snprintf(definition, 4090, "\t\"%s\" %s%s%s%s %s",
+        snprintf(definition, 8190, "\t\"%s\" %s%s%s%s %s",
             o_column_name, o_data_type, scale,
                 (i_data_default != 0 ? "" : " DEFAULT "),
                 (i_data_default != 0 ? "" : o_data_default),
@@ -273,15 +273,21 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
 
         switch (i_constraint_type == 0 ? o_constraint_type[0] : 'x') {
             case 'R':
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wformat-truncation"
                 snprintf(tmpstr_part, 500, " (%s) REFERENCES \"%s\".\"%s\"(%s)",
                     (i_colstr == 0 ? o_colstr : "???"),
                     (i_ref_owner == 0 ? o_ref_owner : "???"),
                     (i_ref_table == 0 ? o_ref_table : "???"),
                     (i_ref_colstr == 0 ? o_ref_colstr : "???"));
+                #pragma GCC diagnostic pop
                 break;
 
             case 'C':
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wformat-truncation"
                 snprintf(tmpstr_part, 500, " (%s)", (i_search_condition == 0 ? o_search_condition : "???"));
+                #pragma GCC diagnostic pop
                 break;
         }
         strcat(tmpstr, tmpstr_part);
@@ -387,10 +393,14 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
             strcat(tmp, ", ");
         }
 
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wformat-truncation"
         if (strcmp(ORA_NVL(column_expression, "_IS_NULL_"), "_IS_NULL_") == 0)
             snprintf(tmp_buff, 500, "\"%s\"", ORA_NVL(column_name, "???"));
         else
             snprintf(tmp_buff, 500, "%s", ORA_NVL(column_expression, "???"));
+        #pragma GCC diagnostic pop
+
         strcat(tmp_buff, (strcmp(ORA_NVL(column_descend, "?"), "DESC") == 0 ? " DESC" : ""));
         strcat(tmp, tmp_buff);
     }

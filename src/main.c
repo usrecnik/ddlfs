@@ -79,9 +79,10 @@ int main(int argc, char *argv[]) {
     // force single-threaded mode
     fuse_opt_add_arg(&args, "-s");
 
+    #ifdef _MSC_VER
     struct fuse_operations oper = {
-        .getattr  = fs_getattr,
-        .readdir  = fs_readdir,
+        .getattr  = fs_getattr_v29,
+        .readdir  = fs_readdir_v29,
         .read     = fs_read,
         .write    = fs_write,
         .open     = fs_open,
@@ -90,6 +91,19 @@ int main(int argc, char *argv[]) {
         .release  = fs_release,
         .unlink   = fs_unlink
     };
+    #else
+    struct fuse_operations oper = {
+        .getattr  = fs_getattr_v30,
+        .readdir  = fs_readdir_v30,
+        .read     = fs_read,
+        .write    = fs_write,
+        .open     = fs_open,
+        .create   = fs_create,
+        .truncate = fs_truncate,
+        .release  = fs_release,
+        .unlink   = fs_unlink
+    };
+	#endif
 
     if (ora_connect(g_conf.username, g_conf.password, g_conf.database) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "Unable to connect to database.");

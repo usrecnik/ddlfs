@@ -248,13 +248,7 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
 }
 
 int fs_getattr(	const char *path,
-                DDLFS_STRUCT_STAT *st
-#ifdef _MSC_VER
-                // not available in dokan
-#else
-                ,struct fuse_file_info *fi
-#endif
-)
+                DDLFS_STRUCT_STAT *st)
 {
     char **part;
     int depth = fs_path_create(&part, path);
@@ -347,17 +341,22 @@ int fs_getattr(	const char *path,
     return 0;
 }
 
+int fs_getattr_v29(const char *path,
+				   DDLFS_STRUCT_STAT *st) {
+	return fs_getattr(path, st);
+}
+
+int fs_getattr_v30(const char *path,
+				   DDLFS_STRUCT_STAT *st,
+				   struct fuse_file_info *fi) {
+	return fs_getattr(path, st);
+}
+
 int fs_readdir(	const char *path, 
                	void *buffer, 
                	fuse_fill_dir_t filler,
 				off_t offset, 
-               	struct fuse_file_info *fi
-#ifdef _MSC_VER
-                // not available in dokan
-#else
-                ,enum fuse_readdir_flags flags
-#endif
-)
+               	struct fuse_file_info *fi)
 {
     logmsg(LOG_DEBUG, "fuse-readdir: [%s]", path);
 
@@ -382,6 +381,23 @@ int fs_readdir(	const char *path,
     fs_path_free(part);
     
     return 0;
+}
+
+int fs_readdir_v29(const char *path,
+               	   void *buffer,
+               	   fuse_fill_dir_t filler,
+				   off_t offset,
+               	   struct fuse_file_info *fi) {
+  	return fs_readdir(path, buffer, filler, offset, fi);
+}
+
+int fs_readdir_v30(const char *path,
+               	   void *buffer,
+               	   fuse_fill_dir_t filler,
+				   off_t offset,
+               	   struct fuse_file_info *fi,
+               	   enum fuse_readdir_flags flags) {
+  	return fs_readdir(path, buffer, filler, offset, fi);
 }
 
 // return file handle or -1 on error

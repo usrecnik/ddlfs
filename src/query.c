@@ -24,7 +24,7 @@
 #include "util.h"
 #include "query_tables.h"
 
-#define PATH_MAX 8192
+#define DDLFS_PATH_MAX 8192
 #define LOB_BUFFER_SIZE 8192
 
 
@@ -79,12 +79,12 @@ int qry_object_fname(const char *schema,
                      const char *type,
                      const char *object,
                      char **fname) {
-    *fname = malloc(PATH_MAX * sizeof(char));
+    *fname = malloc(DDLFS_PATH_MAX * sizeof(char));
     if (*fname == NULL) {
-        logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", PATH_MAX);
+        logmsg(LOG_ERROR, "Unable to malloc fname (size=%d)", DDLFS_PATH_MAX);
         return EXIT_FAILURE;
     }
-    snprintf(*fname, PATH_MAX, "%s%sddlfs-%s.%s.%s.tmp",
+    snprintf(*fname, DDLFS_PATH_MAX, "%s%sddlfs-%s.%s.%s.tmp",
         g_conf._temppath, PATH_SEP, schema, type, object);
     return EXIT_SUCCESS;
 }
@@ -1039,10 +1039,7 @@ int qry_exec_ddl(char *schema, char *object, char *ddl) {
     int retval = EXIT_SUCCESS;
     OCIStmt *stm = NULL;
     char ddl_msg[120];
-    if (ddl_msg == NULL) {
-        logmsg(LOG_ERROR, "qry_exec_ddl() - unable to malloc ddl_msg");
-        return EXIT_FAILURE;
-    }
+
     // prepare log message (first 120 characters without newlines)
     strncpy(ddl_msg, ddl, 119);
     ddl_msg[119] = '\0';
