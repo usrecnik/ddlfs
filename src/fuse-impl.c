@@ -6,6 +6,8 @@
 	__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 #endif
 
+#include "fuse-version.h"
+
 #include <fuse.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -245,9 +247,14 @@ static t_fsentry* fs_vfs_by_path(char **path, int loadFound) {
     return entries[DEPTH_MAX-1];
 }
 
-int fs_getattr(	const char *path, 
-				DDLFS_STRUCT_STAT *st
-				/*,  struct fuse_file_info *fi*/)
+int fs_getattr(	const char *path,
+                DDLFS_STRUCT_STAT *st
+#ifdef _MSC_VER
+                // not available in dokan
+#else
+                ,struct fuse_file_info *fi
+#endif
+)
 {
     char **part;
     int depth = fs_path_create(&part, path);
@@ -306,7 +313,7 @@ int fs_getattr(	const char *path,
     st->st_atim = tmp;
     st->st_mtim = tmp; // /* Time of last modification */
     st->st_ctim = tmp; // /* Time of last status change */
-#else _MSC_VER        
+#else
     st->st_atime = entry->modified;
     st->st_mtime = entry->modified; // /* Time of last modification */
     st->st_ctime = entry->modified; // /* Time of last status change */
@@ -345,7 +352,12 @@ int fs_readdir(	const char *path,
                	fuse_fill_dir_t filler,
 				off_t offset, 
                	struct fuse_file_info *fi
-               	/*, enum fuse_readdir_flags flags */)
+#ifdef _MSC_VER
+                // not available in dokan
+#else
+                ,enum fuse_readdir_flags flags
+#endif
+)
 {
     logmsg(LOG_DEBUG, "fuse-readdir: [%s]", path);
 
@@ -758,8 +770,8 @@ int fs_create (const char *path,
 }
 
 int fs_truncate(const char *path,
-                off_t size
-                /* struct fuse_file_info *fi // only in new version of libfuse */) {
+                off_t size,
+                struct fuse_file_info *fi) {
     logmsg(LOG_INFO, "fs_truncate() - [%s] to [%d] bytes", path, size);
 	
 	char *fname;

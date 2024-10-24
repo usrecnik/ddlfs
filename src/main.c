@@ -1,4 +1,4 @@
-#define FUSE_USE_VERSION 30
+#include "fuse-version.h"
 
 #include <fuse.h>
 #include <fcntl.h>
