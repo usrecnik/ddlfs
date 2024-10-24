@@ -23,8 +23,24 @@
 #include "tempfs.h"
 #include "dbro_refresh.h"
 
+#define DDLFS_VERSION "3.0"
 
-#define DDLFS_VERSION "2.4"
+// extern's from logging.h:
+char *g_ddl_log_buf;   // contents of in-memory "ddlfs.log"
+time_t g_ddl_log_time; // time when the contents last changed
+size_t g_ddl_log_len;
+
+// extern from config.h:
+struct s_global_config g_conf;
+
+// extern from vfs.h:
+t_fsentry *g_vfs = NULL;
+t_fsentry *g_vfs_last_schema = NULL;
+
+// extern from oracle.h:
+struct s_connection g_connection = { 0 };
+
+
 
 void sigusr1_handler(int signo) {
     logmsg(LOG_INFO, " ");

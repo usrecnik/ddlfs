@@ -15,7 +15,9 @@ struct s_connection {
     OCISvcCtx*  svc;
     OCISession* ses;
     int         read_only; // 0 => rw, 1=ro (select open_mode from v$database)
-} g_connection;
+};
+
+extern struct s_connection g_connection;
 
 // @todo - this should be "static"
 sword ora_check(sword status);

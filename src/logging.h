@@ -13,9 +13,9 @@
 
 #define DDL_LOG_SIZE 10000
 
-char *g_ddl_log_buf;   // contents of in-memory "ddlfs.log"
-time_t g_ddl_log_time; // time when the contents last changed
-size_t g_ddl_log_len;
+extern char *g_ddl_log_buf;   // contents of in-memory "ddlfs.log"
+extern time_t g_ddl_log_time; // time when the contents last changed
+extern size_t g_ddl_log_len;
 
 
 // log message to stdout/stderr

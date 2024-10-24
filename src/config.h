@@ -27,7 +27,9 @@ struct s_global_config {
 	int _mount_pid;
 #endif
     time_t _mount_stamp;
-} g_conf;
+};
+
+extern struct s_global_config g_conf;
 
 
 /**

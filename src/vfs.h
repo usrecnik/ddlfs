@@ -14,8 +14,8 @@ typedef struct s_fsentry {
 	int     allocated;
 } t_fsentry;
 
-t_fsentry *g_vfs;
-t_fsentry *g_vfs_last_schema;
+extern t_fsentry *g_vfs;
+extern t_fsentry *g_vfs_last_schema;
 
 
 t_fsentry* vfs_entry_create(const char type, 
