@@ -374,10 +374,10 @@ int fs_readdir(	const char *path,
         return -ENOENT;
     }
 
-    filler(buffer, ".", NULL, 0);
-    filler(buffer, "..", NULL, 0);
+    filler(buffer, ".", NULL, 0, 0);
+    filler(buffer, "..", NULL, 0, 0);
     for (int i = 0; i < entry->count; i++)
-        filler(buffer, entry->children[i]->fname, NULL, 0);
+        filler(buffer, entry->children[i]->fname, NULL, 0, 0);
 
     fs_path_free(part);
     
@@ -543,7 +543,7 @@ int fs_release(const char *path,
     size_t buf_len = 0;
     char *buf = NULL;
     int fd = -1;
-    int cache_already_removed = 0;
+    // int cache_already_removed = 0;
 
     if (strcmp(path, "/ddlfs.log") == 0)
         return 0;
@@ -637,7 +637,7 @@ int fs_release(const char *path,
             if (tfs_rmfile(fname) != EXIT_SUCCESS) {
                 logmsg(LOG_ERROR, "fs_release - unable to remove cache file [%s] after DDL.", fname);
             }
-            cache_already_removed = 1;
+            // cache_already_removed = 1;
         }
     }
 
