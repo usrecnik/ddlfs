@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fuse.h>
 #include <time.h>
 
 typedef struct s_fsentry {
