@@ -6,6 +6,7 @@ all:
 	cl \
 	/I $(LD_LIBRARY_PATH)\sdk\include \
 	/I "C:\Program Files\Dokan\DokanLibrary-2.2.0\include" \
+	/D_CRT_SECURE_NO_WARNINGS \
 	/W4 /RTCcsu /c /Gs /GS /ZI /Fd:ddlfs.pdb \
 	main.c logging.c config.c fuse-impl.c query.c query_tables.c vfs.c oracle.c tempfs.c util.c dbro_refresh.c
 	

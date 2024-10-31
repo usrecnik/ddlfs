@@ -341,13 +341,13 @@ int fs_getattr(	const char *path,
     return 0;
 }
 
-int fs_getattr_v29(const char *path,
+#ifdef _MSC_VER
+int fs_getattr_win(const char *path,
 				   DDLFS_STRUCT_STAT *st) {
 	return fs_getattr(path, st);
 }
-
-#ifndef _MSC_VER
-int fs_getattr_v30(const char *path,
+#else
+int fs_getattr_lnx(const char *path,
 				   DDLFS_STRUCT_STAT *st,
 				   struct fuse_file_info *fi) {
 	return fs_getattr(path, st);
@@ -385,16 +385,16 @@ int fs_readdir(	const char *path,
     return 0;
 }
 
-int fs_readdir_v29(const char *path,
+#ifdef _MSC_VER
+int fs_readdir_win(const char *path,
                	   void *buffer,
                	   fuse_fill_dir_t filler,
-				   off_t offset,
+                   __int64 offset,
                	   struct fuse_file_info *fi) {
   	return fs_readdir(path, buffer, filler, offset, fi);
 }
-
-#ifndef _MSC_VER
-int fs_readdir_v30(const char *path,
+#else
+int fs_readdir_lnx(const char *path,
                	   void *buffer,
                	   fuse_fill_dir_t filler,
 				   off_t offset,
@@ -539,6 +539,16 @@ int fs_read(const char *path,
     return res;
 }
 
+#ifdef _MSC_VER
+int fs_read_win(const char* path,
+    char* buffer,
+    size_t size,
+    __int64 offset,
+    struct fuse_file_info* fi) {
+    return fs_read(buffer, size, offset, fi);
+}
+#endif
+
 int fs_write(const char *path,
              const char *buf,
              size_t size,
@@ -550,6 +560,15 @@ int fs_write(const char *path,
         return -errno;
     return res;
 }
+#ifdef _MSC_VER
+int fs_write_win(const char* path,
+    const char* buf,
+    size_t size,
+    __int64 offset,
+    struct fuse_file_info* fi) {
+    return fs_write(path, buf, size, offset, fi);
+}
+#endif
 
 int fs_release(const char *path,
                struct fuse_file_info *fi) {

@@ -97,20 +97,20 @@ int main(int argc, char *argv[]) {
 
     #ifdef _MSC_VER
     struct fuse_operations oper = {
-        .getattr  = fs_getattr_v29,
-        .readdir  = fs_readdir_v29,
-        .read     = fs_read,
-        .write    = fs_write,
-        .open     = fs_open,
+        .getattr  = fs_getattr_win,
+        .readdir = fs_readdir_win,
+        .read = fs_read_win,
+        .write = fs_write_win,
+        .open = fs_open,
         .create   = fs_create,
-        .truncate = fs_truncate,
+        .truncate = fs_truncate, // @todo
         .release  = fs_release,
         .unlink   = fs_unlink
     };
     #else
     struct fuse_operations oper = {
-        .getattr  = fs_getattr_v30,
-        .readdir  = fs_readdir_v30,
+        .getattr  = fs_getattr_lnx,
+        .readdir  = fs_readdir_lnx,
         .read     = fs_read,
         .write    = fs_write,
         .open     = fs_open,
