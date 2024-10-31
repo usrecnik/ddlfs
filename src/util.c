@@ -122,7 +122,7 @@ int strcasecmp(const char *s1, const char *s2) {
 	if (l1 != l2)
 		return 1;
 	
-	for (int i = 0; i < l1; i++) {
+	for (size_t i = 0; i < l1; i++) {
 		int retval = toupper(s1[i]) - toupper(s2[i]);
 		if (retval != 0)
 			return retval;
