@@ -120,7 +120,7 @@ int str_fn2obj(char **dst, char *src, const char *objectType) {
             return EXIT_FAILURE;
         }
 
-        for (int i = 0; i < expectedLen; i++) {
+        for (size_t i = 0; i < expectedLen; i++) {
             size_t c = len-i-1;
             if (c < 0)
                 actualSuffix[i] = '\0';

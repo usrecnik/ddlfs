@@ -273,21 +273,29 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
 
         switch (i_constraint_type == 0 ? o_constraint_type[0] : 'x') {
             case 'R':
+                #ifdef __GNUC__
                 #pragma GCC diagnostic push
                 #pragma GCC diagnostic ignored "-Wformat-truncation"
+                #endif
                 snprintf(tmpstr_part, 500, " (%s) REFERENCES \"%s\".\"%s\"(%s)",
                     (i_colstr == 0 ? o_colstr : "???"),
                     (i_ref_owner == 0 ? o_ref_owner : "???"),
                     (i_ref_table == 0 ? o_ref_table : "???"),
                     (i_ref_colstr == 0 ? o_ref_colstr : "???"));
+                #ifdef __GNUC__
                 #pragma GCC diagnostic pop
+                #endif
                 break;
 
             case 'C':
+                #ifdef __GNUC__
                 #pragma GCC diagnostic push
                 #pragma GCC diagnostic ignored "-Wformat-truncation"
+                #endif
                 snprintf(tmpstr_part, 500, " (%s)", (i_search_condition == 0 ? o_search_condition : "???"));
+                #ifdef __GNUC__
                 #pragma GCC diagnostic pop
+                #endif
                 break;
         }
         strcat(tmpstr, tmpstr_part);
@@ -393,13 +401,17 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
             strcat(tmp, ", ");
         }
 
+        #ifdef __GNUC__
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wformat-truncation"
+        #endif
         if (strcmp(ORA_NVL(column_expression, "_IS_NULL_"), "_IS_NULL_") == 0)
             snprintf(tmp_buff, 500, "\"%s\"", ORA_NVL(column_name, "???"));
         else
             snprintf(tmp_buff, 500, "%s", ORA_NVL(column_expression, "???"));
+        #ifdef __GNUC__
         #pragma GCC diagnostic pop
+        #endif
 
         strcat(tmp_buff, (strcmp(ORA_NVL(column_descend, "?"), "DESC") == 0 ? " DESC" : ""));
         strcat(tmp, tmp_buff);
