@@ -346,11 +346,13 @@ int fs_getattr_v29(const char *path,
 	return fs_getattr(path, st);
 }
 
+#ifndef _MSC_VER
 int fs_getattr_v30(const char *path,
 				   DDLFS_STRUCT_STAT *st,
 				   struct fuse_file_info *fi) {
 	return fs_getattr(path, st);
 }
+#endif
 
 int fs_readdir(	const char *path, 
                	void *buffer, 
@@ -391,6 +393,7 @@ int fs_readdir_v29(const char *path,
   	return fs_readdir(path, buffer, filler, offset, fi);
 }
 
+#ifndef _MSC_VER
 int fs_readdir_v30(const char *path,
                	   void *buffer,
                	   fuse_fill_dir_t filler,
@@ -399,6 +402,7 @@ int fs_readdir_v30(const char *path,
                	   enum fuse_readdir_flags flags) {
   	return fs_readdir(path, buffer, filler, offset, fi);
 }
+#ifndef _MSC_VER
 
 // return file handle or -1 on error
 static int fake_open(const char *path,
