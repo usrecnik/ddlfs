@@ -78,7 +78,16 @@ int fs_create (const char *path,
                struct fuse_file_info *fi);
 
 int fs_truncate(const char *path, 
-                off_t size,
-                struct fuse_file_info *fi);
+                off_t size);
+
+#ifdef _MSC_VER
+int fs_truncate_win(const char* path,
+					__int64 size);
+#else
+int fs_truncate_lnx(const char* path,
+					off_t size,
+					struct fuse_file_info* fi);
+#endif
  
 int fs_unlink(const char *path);
+

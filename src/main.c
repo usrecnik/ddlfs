@@ -55,6 +55,14 @@ void sigusr1_handler(int signo) {
 
 int main(int argc, char *argv[]) {
 
+#ifdef _MSC_VER
+    if (sizeof(__int64) != sizeof(off_t)) {
+        logmsg(LOG_ERROR, "main(): __int64 and off_t have different sizes on this platform. This code is written in assumption that they're of the same size.");
+        return 1;
+    }
+    logmsg(LOG_INFO, "main(): sizeof(off_t)=%d, sizeof(__int64)=%d", sizeof(off_t), sizeof(__int64));
+#endif
+
     memset(&g_conf, 0, sizeof(g_conf));
     g_conf.dbro = -1;
 	g_conf.loglevel = malloc(15 * sizeof(char));
@@ -102,9 +110,9 @@ int main(int argc, char *argv[]) {
         .read = fs_read_win,
         .write = fs_write_win,
         .open = fs_open,
-        .create   = fs_create,
-        .truncate = fs_truncate, // @todo
-        .release  = fs_release,
+        .create = fs_create,
+        .truncate = fs_truncate_win,
+        .release = fs_release,
         .unlink   = fs_unlink
     };
     #else
@@ -115,7 +123,7 @@ int main(int argc, char *argv[]) {
         .write    = fs_write,
         .open     = fs_open,
         .create   = fs_create,
-        .truncate = fs_truncate,
+        .truncate = fs_truncate_lnx,
         .release  = fs_release,
         .unlink   = fs_unlink
     };

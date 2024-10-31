@@ -29,6 +29,9 @@
 	#include <io.h>
 	#define F_OK    0
     #define O_ACCMODE   (_O_RDONLY|_O_WRONLY|_O_RDWR)
+
+    #include <BaseTsd.h>
+    typedef SSIZE_T ssize_t;
 #endif
 
 #include "vfs.h"
@@ -375,10 +378,18 @@ int fs_readdir(	const char *path,
         return -ENOENT;
     }
 
+    // same two blocks of code, but linux (libfuse 3x has one additional parameter to 'filler'):
+#ifdef _MSC_VER
+    filler(buffer, ".", NULL, 0);
+    filler(buffer, "..", NULL, 0);
+    for (int i = 0; i < entry->count; i++)
+        filler(buffer, entry->children[i]->fname, NULL, 0);
+#else
     filler(buffer, ".", NULL, 0, 0);
     filler(buffer, "..", NULL, 0, 0);
     for (int i = 0; i < entry->count; i++)
         filler(buffer, entry->children[i]->fname, NULL, 0, 0);
+#endif
 
     fs_path_free(part);
     
@@ -402,7 +413,7 @@ int fs_readdir_lnx(const char *path,
                	   enum fuse_readdir_flags flags) {
   	return fs_readdir(path, buffer, filler, offset, fi);
 }
-#ifndef _MSC_VER
+#endif
 
 // return file handle or -1 on error
 static int fake_open(const char *path,
@@ -545,7 +556,7 @@ int fs_read_win(const char* path,
     size_t size,
     __int64 offset,
     struct fuse_file_info* fi) {
-    return fs_read(buffer, size, offset, fi);
+    return fs_read(path, buffer, size, offset, fi);
 }
 #endif
 
@@ -655,7 +666,7 @@ int fs_release(const char *path,
                 newLenJava = sprintf(buf, "CREATE OR REPLACE AND COMPILE JAVA SOURCE NAMED \"%s\".\"%s\" AS\n",
                     object_schema, object_name);
 
-            size_t newLen = read(fd, buf+strlen(buf), tmp_stat.st_size);
+            ssize_t newLen = read(fd, buf+strlen(buf), tmp_stat.st_size);
             if (newLen == -1 || newLen != tmp_stat.st_size) {
                 logmsg(LOG_ERROR, "fs_release() - unable to read() [%s], errno=%d (%s) [%d]!=[%d]", fname, errno, strerror(errno), newLen, tmp_stat.st_size);
                 retval = -1;
@@ -809,8 +820,7 @@ int fs_create (const char *path,
 }
 
 int fs_truncate(const char *path,
-                off_t size,
-                struct fuse_file_info *fi) {
+                off_t size) {
     logmsg(LOG_INFO, "fs_truncate() - [%s] to [%d] bytes", path, size);
 	
 	char *fname;
@@ -858,6 +868,21 @@ int fs_truncate(const char *path,
     free(fname);
     return 0;
 }
+
+#ifdef _MSC_VER
+int fs_truncate_win(const char* path,
+                    __int64 size) {
+    return fs_truncate(path, size);
+}
+
+#else
+int fs_truncate_lnx(const char* path,
+                    off_t size,
+                    struct fuse_file_info* fi) {
+    return fs_truncatepath, size);
+}
+#endif
+
 
 int fs_unlink(const char *path) {
     logmsg(LOG_INFO, "fs_unlink() - [%s]", path);
