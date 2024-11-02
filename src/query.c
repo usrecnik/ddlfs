@@ -18,8 +18,8 @@
 
 #include "config.h"
 #include "logging.h"
-#include "oracle.h"
 #include "vfs.h"
+#include "oracle.h"
 #include "tempfs.h"
 #include "util.h"
 #include "query_tables.h"

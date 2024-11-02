@@ -10,8 +10,8 @@
 #include "util.h"
 #include "config.h"
 #include "logging.h"
-#include "oracle.h"
 #include "vfs.h"
+#include "oracle.h"
 #include "tempfs.h"
 
 static int deflist_append(struct deflist **first, const char *def) {

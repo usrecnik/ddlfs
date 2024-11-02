@@ -11,12 +11,13 @@
 	#pragma warning(disable:4996)
 #endif
 
+#include "query.h"
+#include "oracle.h"
 #include "logging.h"
 #include "config.h"
-#include "oracle.h"
 #include "tempfs.h"
 #include "util.h"
-#include "query.h"
+
 
 static int dbr_refresh_object(const char *schema,
                               const char *ora_type,
