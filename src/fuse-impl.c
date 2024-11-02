@@ -402,7 +402,7 @@ int fs_readdir_win(const char *path,
                	   fuse_fill_dir_t filler,
                    __int64 offset,
                	   struct fuse_file_info *fi) {
-  	return fs_readdir(path, buffer, filler, offset, fi);
+  	return fs_readdir(path, buffer, filler, (off_t) offset, fi);
 }
 #else
 int fs_readdir_lnx(const char *path,
@@ -556,7 +556,7 @@ int fs_read_win(const char* path,
     size_t size,
     __int64 offset,
     struct fuse_file_info* fi) {
-    return fs_read(path, buffer, size, offset, fi);
+    return fs_read(path, buffer, size, (off_t) offset, fi);
 }
 #endif
 
@@ -577,7 +577,7 @@ int fs_write_win(const char* path,
     size_t size,
     __int64 offset,
     struct fuse_file_info* fi) {
-    return fs_write(path, buf, size, offset, fi);
+    return fs_write(path, buf, size, (off_t) offset, fi);
 }
 #endif
 
@@ -872,7 +872,7 @@ int fs_truncate(const char *path,
 #ifdef _MSC_VER
 int fs_truncate_win(const char* path,
                     __int64 size) {
-    return fs_truncate(path, size);
+    return fs_truncate(path, (off_t) size);
 }
 
 #else
