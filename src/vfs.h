@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fuse-version.h"
 #include <fuse.h>
 #include <time.h>
 

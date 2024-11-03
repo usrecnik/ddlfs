@@ -879,7 +879,7 @@ int fs_truncate_win(const char* path,
 int fs_truncate_lnx(const char* path,
                     off_t size,
                     struct fuse_file_info* fi) {
-    return fs_truncatepath, size);
+    return fs_truncate(path, size);
 }
 #endif
 
