@@ -1,16 +1,17 @@
 LD_LIBRARY_PATH=..\..\instantclient_23_5
+DOKAN_PATH=C:\Program Files\Dokan\DokanLibrary-2.2.0
 
 all:
 	"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 	
 	cl \
 	/I $(LD_LIBRARY_PATH)\sdk\include \
-	/I "C:\Program Files\Dokan\DokanLibrary-2.2.0\include" \
+	/I "$(DOKAN_PATH)\include" \
 	/D_CRT_SECURE_NO_WARNINGS \
 	/W4 /RTCcsu /c /Gs /GS /ZI /Fd:ddlfs.pdb \
 	main.c logging.c config.c fuse-impl.c query.c query_tables.c vfs.c oracle.c tempfs.c util.c dbro_refresh.c
 	
-	link /DEBUG:FULL /out:ddlfs.exe /LIBPATH:. /LIBPATH:$(LD_LIBRARY_PATH)\sdk\lib\msvc\ /LIBPATH:"C:\Program Files\Dokan\Dokan Library-1.2.1\lib" oci.lib dokanfuse1.lib *.obj
+	link /DEBUG:FULL /out:ddlfs.exe /LIBPATH:. /LIBPATH:$(LD_LIBRARY_PATH)\sdk\lib\msvc\ /LIBPATH:"$(DOKAN_PATH)\lib" oci.lib dokanfuse2.lib *.obj
 	del *.obj
 
 	if not exist "..\target" mkdir ..\target
