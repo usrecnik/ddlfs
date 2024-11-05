@@ -14,14 +14,16 @@ all:
 	link /DEBUG:FULL /out:ddlfs.exe /LIBPATH:. /LIBPATH:$(LD_LIBRARY_PATH)\sdk\lib\msvc\ /LIBPATH:"$(DOKAN_PATH)\lib" oci.lib dokanfuse2.lib *.obj
 	del *.obj
 
-release: all
+release:
 	if not exist "..\target" mkdir ..\target
-	"C:\Program Files (x86)\WiX Toolset v3.11\bin\heat.exe" dir E:\urh\instantclient_18_3\ -gg -cg clientCG -ke -srd -dr InstantClient -platform x64 -sfrag -sreg -out ic.wxs
-	"C:\Program Files (x86)\WiX Toolset v3.11\bin\candle.exe" -arch x64 ic.wxs WindowsInstaller.wxs
-	"C:\Program Files (x86)\WiX Toolset v3.11\bin\light.exe"  WindowsInstaller.wixobj ic.wixobj -b E:\urh\instantclient_18_3\ -out ..\target\ddlfs.msi
-	del *.wixobj
-	del ic.wxs
-	del ..\target\ddlfs.wixpdb
+	
+	cd ..\win\
+
+	del *.exe *.cab *.wixpdb ddlfs*.msi
+
+	wix build ddlfs-installer.wxs
+
+	wix build -ext WixToolset.BootstrapperApplications.wixext ddlfs-bundle.wxs
 
 clean:
 	del *.obj

@@ -1,0 +1,13 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="ddlfs" Manufacturer="usrecnik" Version="3.0.0.0" UpgradeCode="39a6a88d-c944-4118-a224-f70f5d02d82f">	  
+    <StandardDirectory Id="ProgramFiles6432Folder">		
+		<Directory Id="INSTALLFOLDER" Name="ddlfs" />
+	</StandardDirectory>
+	  
+    <Feature Id="Main">		
+		<Component>
+			<File Source="..\src\ddlfs.exe" />
+		</Component>		
+    </Feature>
+  </Package>
+</Wix>
