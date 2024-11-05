@@ -17,9 +17,7 @@ all:
 release:
 	if not exist "..\target" mkdir ..\target
 	
-	cd ..\win\
-
-	del *.exe *.cab *.wixpdb ddlfs*.msi
+	cd ..\win\	
 
 	wix build ddlfs-installer.wxs
 
@@ -31,3 +29,7 @@ clean:
 	del *.wixobj
 	del ic.wxs
 	del ..\target\ddlfs.wixpdb
+	del ..\win\*.exe
+	del ..\win\*.cab
+	del ..\win\*.wixpdb
+	del ..\win\ddlfs*.msi

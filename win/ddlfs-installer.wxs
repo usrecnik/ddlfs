@@ -1,13 +1,53 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="ddlfs" Manufacturer="usrecnik" Version="3.0.0.0" UpgradeCode="39a6a88d-c944-4118-a224-f70f5d02d82f">	  
-    <StandardDirectory Id="ProgramFiles6432Folder">		
-		<Directory Id="INSTALLFOLDER" Name="ddlfs" />
+  <Package Name="ddlfs" Manufacturer="usrecnik" Version="3.0.0.0" UpgradeCode="39a6a88d-c944-4118-a224-f70f5d02d82f" Scope="perMachine">  
+    <StandardDirectory Id="ProgramFiles64Folder">
+		<Directory Id="INSTALLFOLDER" Name="ddlfs">
+			<Directory Id="IC_FOLDER" Name="instant_client" />
+		</Directory>			
 	</StandardDirectory>
 	  
     <Feature Id="Main">		
-		<Component>
+		<Component Directory="INSTALLFOLDER" Bitness="always64">
 			<File Source="..\src\ddlfs.exe" />
-		</Component>		
+		</Component>
+		<Component Directory="IC_FOLDER" Bitness="always64" Guid="2bd9e3ee-211d-4d04-9248-a62c5f87137e">
+			<!-- use instant-client-files.ps1 to generate following list: -->
+			<File Source="..\..\instantclient_23_5\adrci.exe" />
+			<File Source="..\..\instantclient_23_5\adrci.sym" />
+			<File Source="..\..\instantclient_23_5\BASIC_LICENSE" />
+			<File Source="..\..\instantclient_23_5\BASIC_README" />
+			<File Source="..\..\instantclient_23_5\extks.dll" />
+			<File Source="..\..\instantclient_23_5\fips.dll" />
+			<File Source="..\..\instantclient_23_5\genezi.exe" />
+			<File Source="..\..\instantclient_23_5\genezi.sym" />
+			<File Source="..\..\instantclient_23_5\legacy.dll" />
+			<File Source="..\..\instantclient_23_5\oci.dll" />
+			<File Source="..\..\instantclient_23_5\oci.sym" />
+			<File Source="..\..\instantclient_23_5\ocijdbc23.dll" />
+			<File Source="..\..\instantclient_23_5\ocijdbc23.sym" />
+			<File Source="..\..\instantclient_23_5\ociw32.dll" />
+			<File Source="..\..\instantclient_23_5\ociw32.sym" />
+			<File Source="..\..\instantclient_23_5\ojdbc11.jar" />
+			<File Source="..\..\instantclient_23_5\ojdbc8.jar" />
+			<File Source="..\..\instantclient_23_5\orannz.dll" />
+			<File Source="..\..\instantclient_23_5\orannz.sym" />
+			<File Source="..\..\instantclient_23_5\oraocci23.dll" />
+			<File Source="..\..\instantclient_23_5\oraocci23.sym" />
+			<File Source="..\..\instantclient_23_5\oraocci23d.dll" />
+			<File Source="..\..\instantclient_23_5\oraocci23d.sym" />
+			<File Source="..\..\instantclient_23_5\oraociei.dll" />
+			<File Source="..\..\instantclient_23_5\oraociei.sym" />
+			<File Source="..\..\instantclient_23_5\orasql.dll" />
+			<File Source="..\..\instantclient_23_5\orasql.sym" />
+			<File Source="..\..\instantclient_23_5\pkcs11.dll" />
+			<File Source="..\..\instantclient_23_5\SDK_LICENSE" />
+			<File Source="..\..\instantclient_23_5\SDK_README" />
+			<File Source="..\..\instantclient_23_5\ucp.jar" />
+			<File Source="..\..\instantclient_23_5\ucp11.jar" />
+			<File Source="..\..\instantclient_23_5\uidrvci.exe" />
+			<File Source="..\..\instantclient_23_5\uidrvci.sym" />
+			<File Source="..\..\instantclient_23_5\xstreams.jar" />
+		</Component>
     </Feature>
   </Package>
 </Wix>
