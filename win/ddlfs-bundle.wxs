@@ -5,12 +5,13 @@
           UpgradeCode="39a6a88d-c944-4118-a224-f70f5d02d82f">
      
     <BootstrapperApplication>
-        <bal:WixStandardBootstrapperApplication LicenseUrl="https://github.com/usrecnik/ddlfs/blob/master/LICENSE" Theme="hyperlinkLicense" />
+      <bal:WixStandardBootstrapperApplication LicenseUrl="https://github.com/usrecnik/ddlfs/blob/master/LICENSE" Theme="hyperlinkLicense" />
     </BootstrapperApplication>
     
     <Chain>
       <MsiPackage SourceFile="ddlfs-installer.msi" Vital="yes" />
       <MsiPackage SourceFile="dokan_x64_2_2_0_1000.msi" Vital="yes" />
+	  <ExePackage SourceFile="vc_redist.x64.exe" Vital="yes" InstallArguments="/install /quiet /norestart" Permanent="yes" DetectCondition="true" />
     </Chain>
   </Bundle>
 </Wix>

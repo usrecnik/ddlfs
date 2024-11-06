@@ -7,7 +7,7 @@
 	</StandardDirectory>
 	  
     <Feature Id="Main">		
-		<Component Directory="INSTALLFOLDER" Bitness="always64">
+		<Component Directory="INSTALLFOLDER" Bitness="always64" Guid="b3710130-17b9-40ed-adff-410dbf518c5d">
 			<File Source=".\ddlfs_.exe" />
 			<File Source=".\ddlfs.bat" />
 		</Component>

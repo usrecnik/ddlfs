@@ -21,6 +21,8 @@ release:
 
 	cd ..\win\
 
+	curl -o "vc_redist.x64.exe" "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+
 	wix build -arch x64 ddlfs-installer.wxs
 
 	wix build -ext WixToolset.BootstrapperApplications.wixext ddlfs-bundle.wxs
