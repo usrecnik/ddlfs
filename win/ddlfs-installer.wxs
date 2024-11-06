@@ -8,7 +8,8 @@
 	  
     <Feature Id="Main">		
 		<Component Directory="INSTALLFOLDER" Bitness="always64">
-			<File Source="..\src\ddlfs.exe" />
+			<File Source=".\ddlfs_.exe" />
+			<File Source=".\ddlfs.bat" />
 		</Component>
 		<Component Directory="IC_FOLDER" Bitness="always64" Guid="2bd9e3ee-211d-4d04-9248-a62c5f87137e">
 			<!-- use instant-client-files.ps1 to generate following list: -->

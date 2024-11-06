@@ -17,7 +17,9 @@ all:
 release:
 	if not exist "..\target" mkdir ..\target
 	
-	cd ..\win\	
+	copy ddlfs.exe ..\win\ddlfs_.exe
+
+	cd ..\win\
 
 	wix build -arch x64 ddlfs-installer.wxs
 
