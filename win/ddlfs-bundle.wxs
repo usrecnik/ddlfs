@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" 
      xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
       
-  <Bundle Name="ddlfs Bundle" Version="3.0.0.0" Manufacturer="usrecnik" 
+  <Bundle Name="DDLFS Bundle" Version="3.0.0.0" Manufacturer="usrecnik" 
           UpgradeCode="39a6a88d-c944-4118-a224-f70f5d02d82f">
      
     <BootstrapperApplication>

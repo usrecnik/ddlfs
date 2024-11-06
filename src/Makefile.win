@@ -19,7 +19,7 @@ release:
 	
 	cd ..\win\	
 
-	wix build ddlfs-installer.wxs
+	wix build -arch x64 ddlfs-installer.wxs
 
 	wix build -ext WixToolset.BootstrapperApplications.wixext ddlfs-bundle.wxs
 
