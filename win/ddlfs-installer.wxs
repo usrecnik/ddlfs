@@ -6,7 +6,16 @@
 		</Directory>			
 	</StandardDirectory>
 	  
-    <Feature Id="Main">		
+    <Feature Id="Main">
+		<Component Id="AddToPathComponent" Guid="10ebb325-09ad-4109-82b7-d7c1a3fa3060">
+			<Environment Id="AddToPath"
+					     Action="set"
+						 Part="last" 
+						 Name="PATH"
+						 Permanent="no" 
+						 System="yes" 
+						 Value="[INSTALLFOLDER]" />		
+		</Component>
 		<Component Directory="INSTALLFOLDER" Bitness="always64" Guid="b3710130-17b9-40ed-adff-410dbf518c5d">
 			<File Source=".\ddlfs_.exe" />
 			<File Source=".\ddlfs.bat" />
