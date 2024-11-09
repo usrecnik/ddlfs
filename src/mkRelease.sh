@@ -1,5 +1,8 @@
 #!/bin/bash -eu
 #
+# prereq:
+#   cp instantclient-basic-linux.x64-23.6.0.24.10.zip ./instantclient_23_6/  # (basic.zip is expected inside this folder)
+#
 
 PKG_NAME='ddlfs'
 PKG_VERS="$(cat main.c  | grep '#define DDLFS_VERSION' | awk '{print $3}' | tr -d '"' | tr '-' '.')"
@@ -8,6 +11,8 @@ PKG_MAIN='"Urh Srecnik" <urh.srecnik@abakus.si>'
 PKG_DESC='Filesystem which represents Oracle Database objects as their DDL stored in .sql files.'
 PKG_FULL_NAME="${PKG_NAME}-${PKG_VERS}"
 INSTANT_CLIENT_PATH="$(cat Makefile  | grep '^export LD_LIBRARY_PATH' | cut -d'=' -f2)"
+
+echo "${INSTANT_CLIENT_PATH}/instantclient-basic-linux.x64-*.zip"
 
 function proc_copy() {
     mkdir -p ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/
