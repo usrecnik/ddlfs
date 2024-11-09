@@ -1,0 +1,1 @@
+"C:\Program Files\Dokan\DokanLibrary-2.2.0\dokanctl" /u %*
