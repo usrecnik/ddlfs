@@ -29,22 +29,34 @@ function proc_copy() {
     mv -v ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/instantclient_* ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/ic
 }
 
+# P1=ubuntu|debian
 function proc_deb() {
     echo ' '
     echo 'Building .deb'
     echo '-------------'
-    echo ' '
-    
-    readonly l_cf="../target/${PKG_FULL_NAME}/DEBIAN/control"
-    readonly l_cp="../target/${PKG_FULL_NAME}/DEBIAN/copyright"
+    echo ' '    
+
+    l_cf="../target/${PKG_FULL_NAME}/DEBIAN/control"
+    l_cp="../target/${PKG_FULL_NAME}/DEBIAN/copyright"
+    l_pi="../target/${PKG_FULL_NAME}/DEBIAN/postinst"
     mkdir -p "$(dirname "$l_cf")"
+
+    case "$1" in
+        ubuntu24)
+            l_deps='libfuse3-3, libaio1t64'
+            ;;
+
+        debian)
+            l_deps='libfuse3-3, libaio1'
+            ;;
+    esac
 
     > "$l_cf"   
     echo "Package: $PKG_NAME"      >> "$l_cf"
     echo "Version: $PKG_VERS"      >> "$l_cf"
     echo "Architecture: $PKG_ARCH" >> "$l_cf"
     echo "Maintainer: $PKG_MAIN"   >> "$l_cf"
-    echo "Depends: fuse, libaio1"  >> "$l_cf"
+    echo "Depends: $l_deps"        >> "$l_cf"
     echo "Description: $PKG_DESC"  >> "$l_cf"
     echo ' n/a'                    >> "$l_cf" # extended description
 
@@ -52,9 +64,20 @@ function proc_deb() {
     echo "Files: *"                 >> "$l_cp"
     echo "Copyright: $PKG_MAIN"     >> "$l_cp"
     echo "License: MIT"             >> "$l_cp"
+
+    > "$l_pi"
+    echo "#!/bin/bash" >> "$l_pi"
+    echo "if [ ! -e /usr/lib/x86_64-linux-gnu/libaio.so.1 ]" >> "$l_pi"
+    echo "then" >> "$l_pi"
+    # ubuntu has renamed this package, so we need to "fix" it:
+    echo "  ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1" >> "$l_pi"
+    echo "fi" >> "$l_pi"
     
+    chmod 775 "$l_pi"
+
     chown -R root:root ../target/*
     dpkg-deb -b ../target/$PKG_FULL_NAME
+    mv ../target/${PKG_FULL_NAME}.deb ../target/${PKG_FULL_NAME}-${1}.deb
 
     rm -r "$(dirname "$l_cf")"
 }
@@ -75,7 +98,7 @@ function proc_rpm() {
     echo "License: MIT"                 >> "$l_spec"
     echo "Group: Unknown"               >> "$l_spec"
     echo "AutoReqProv: no"              >> "$l_spec"
-    echo "Requires: libaio, fuse, fuse-libs" >> "$l_spec"
+    echo "Requires: libaio, fuse3"      >> "$l_spec"
     echo '%description'                 >> "$l_spec"
     echo 'n/a'                          >> "$l_spec"
     echo '%files'                       >> "$l_spec"
@@ -113,12 +136,14 @@ proc_copy
 
 case "$PKG_TYPE" in
     "ALL")
-        proc_deb
+        proc_deb 'ubuntu24'
+        proc_deb 'debian'
         proc_rpm
         ;;
 
     "DEB")
-        proc_deb
+        proc_deb 'ubuntu24'
+        proc_deb 'debian'
         ;;
 
     "RPM")
