@@ -1,4 +1,4 @@
-LD_LIBRARY_PATH=../../instantclient_23_5
+LD_LIBRARY_PATH=../../instantclient_23_6
 
 all:
 	@echo LD_LIBRARY_PATH=${LD_LIBRARY_PATH}	
