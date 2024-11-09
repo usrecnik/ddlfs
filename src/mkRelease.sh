@@ -11,10 +11,10 @@ PKG_MAIN='"Urh Srecnik" <urh.srecnik@abakus.si>'
 PKG_DESC='Filesystem which represents Oracle Database objects as their DDL stored in .sql files.'
 PKG_FULL_NAME="${PKG_NAME}-${PKG_VERS}"
 INSTANT_CLIENT_PATH="$(cat Makefile  | grep '^export LD_LIBRARY_PATH' | cut -d'=' -f2)"
-
-echo "${INSTANT_CLIENT_PATH}/instantclient-basic-linux.x64-*.zip"
+PKG_TYPE="${1:-ALL}"
 
 function proc_copy() {
+    rm -rf ../target/${PKG_FULL_NAME}
     mkdir -p ../target/${PKG_FULL_NAME}/usr/lib/ddlfs/
     mkdir -p ../target/${PKG_FULL_NAME}/usr/bin
     mkdir -p ../target/${PKG_FULL_NAME}/usr/share/man/man1
@@ -106,9 +106,25 @@ function proc_rpm() {
 # main()
 ###
 
-echo "Building ${PKG_NAME}-${PKG_VERS}"
+echo "Building ${PKG_NAME}-${PKG_VERS} (pkg_type=$PKG_TYPE)"
 echo "--------------------------------"
 
 proc_copy
-proc_deb
-proc_rpm
+
+case "$PKG_TYPE" in
+    "ALL")
+        proc_deb
+        proc_rpm
+        ;;
+
+    "DEB")
+        proc_deb
+        ;;
+
+    "RPM")
+        proc_rpm
+        ;;
+
+    *)
+esac
+
