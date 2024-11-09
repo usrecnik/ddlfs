@@ -19,6 +19,8 @@
 		<Component Directory="INSTALLFOLDER" Bitness="always64" Guid="b3710130-17b9-40ed-adff-410dbf518c5d">
 			<File Source=".\ddlfs_.exe" />
 			<File Source=".\ddlfs.bat" />
+			<File Source=".\ddlfs-umount.bat" />
+			<File Source=".\ddlfs-fg.bat" />
 		</Component>
 		<Component Directory="IC_FOLDER" Bitness="always64" Guid="2bd9e3ee-211d-4d04-9248-a62c5f87137e">
 			<!-- use instant-client-files.ps1 to generate following list: -->
