@@ -1,1 +1,1 @@
-start /B cmd /c ddlfs %*
+start /B cmd /c ddlfs-fg.bat %*
