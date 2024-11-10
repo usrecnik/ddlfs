@@ -522,9 +522,9 @@ int fs_read(const char *path,
     int res;
 
 #ifdef _MSC_VER
-    if (strcmp(path, "/ddlfs.log") == 0)
-#else
     if (strcmp(path, "\\ddlfs.log") == 0)
+#else
+	if (strcmp(path, "/ddlfs.log") == 0)
 #endif
         return (int) fs_read_ddl_log(buffer, size, offset, fi);
 
