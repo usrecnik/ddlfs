@@ -653,7 +653,12 @@ int fs_release(const char *path,
             }
 
             logmsg(LOG_DEBUG, "Reading %d in buffer size %d, FD=%d", tmp_stat.st_size, buf_len, fi->fh);
+
+#ifdef _MSC_VER
+            fd = open(fname, O_RDONLY | O_BINARY);
+#else
             fd = open(fname, O_RDONLY);
+#endif
             if (fd == -1) {
                 logmsg(LOG_ERROR, "fs_release() - unable to re-open temp file as r/o.");
                 retval = -1;
