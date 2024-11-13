@@ -689,9 +689,13 @@ int fs_release(const char *path,
             else
                 qry_exec_ddl(object_schema, object_name, buf);
 
-            if (tfs_rmfile(fname) != EXIT_SUCCESS) {
+            if (close(fd) == -1) // windows won't allow deleting of open file
+                logmsg(LOG_ERROR, "fs_release() - unable to close underlying r/o file");            
+            fd = -1;
+
+            if (tfs_rmfile(fname) != EXIT_SUCCESS)
                 logmsg(LOG_ERROR, "fs_release - unable to remove cache file [%s] after DDL.", fname);
-            }
+            
             // cache_already_removed = 1;
         }
     }
