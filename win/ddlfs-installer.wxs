@@ -21,6 +21,14 @@
 			<File Source=".\ddlfs.bat" />
 			<File Source=".\ddlfs-umount.bat" />
 			<File Source=".\ddlfs-fg.bat" />
+			
+			<!--
+			this .dll is only needed for releses including and before "v2.2.0.1000", 
+			because this fix: https://github.com/dokan-dev/dokany/issues/1250
+			has not yet been included in them. Once new release is ready, remove this line 
+			and update ddlfs-bundle.wsx to include newer release.
+			-->
+			<File Source=".\dokanfuse2.dll" /> 
 		</Component>
 		<Component Directory="IC_FOLDER" Bitness="always64" Guid="2bd9e3ee-211d-4d04-9248-a62c5f87137e">
 			<!-- use instant-client-files.ps1 to generate following list: -->

@@ -1,4 +1,4 @@
-LD_LIBRARY_PATH=..\..\instantclient_23_5
+LD_LIBRARY_PATH=..\..\instantclient_23_6
 DOKAN_PATH=C:\Program Files\Dokan\DokanLibrary-2.2.0
 
 all:
