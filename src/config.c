@@ -63,7 +63,7 @@ static int ddlfs_opts_proc(void *data, const char *arg, int key, struct fuse_arg
 }
 
 static int mandatory_parameter(const char *value, const char *parameter) {
-    if (value == NULL) {
+    if (value == NULL || strlen(value) < 1) {
         logmsg(LOG_ERROR, "Parameter [%s] is mandatory.", parameter);
         return 1;
     }
