@@ -54,6 +54,17 @@ static void fs_path_free(char **part) {
     free(part);
 }
 
+static const char* get_flagstr(int flags) {
+    if ((flags & O_ACCMODE) == O_RDONLY)
+        return "O_RDONLY";
+    else if ((flags & O_ACCMODE) == O_WRONLY)
+        return "O_WRONLY";
+    else if ((flags & O_ACCMODE) == O_RDWR)
+        return "O_RDWR";
+    else
+        return "none";
+}
+
 static int fs_path_create (char ***part, const char *path) {
     char **r;
     r = malloc(DEPTH_MAX * sizeof(char*));
@@ -469,17 +480,7 @@ int fs_open(const char *path,
         return 0;
     }
 
-    char flagmsg[30];
-    if ((fi->flags & O_ACCMODE) == O_RDONLY)
-        strcpy(flagmsg, "RDONLY");
-    else if ((fi->flags & O_ACCMODE) == O_WRONLY)
-        strcpy(flagmsg, "O_WRONLY");
-    else if ((fi->flags & O_ACCMODE) == O_RDWR)
-        strcpy(flagmsg, "O_RDWR");
-    else
-        strcpy(flagmsg, "none");
-
-    logmsg(LOG_INFO, "fuse-open: [%s], [%s]", path, flagmsg);
+    logmsg(LOG_INFO, "fuse-open: [%s], [%s]", path, get_flagstr(fi->flags));
 
     int fh = fake_open(path, fi);
     if (fh < 0) {
@@ -595,7 +596,7 @@ int fs_release(const char *path,
     if (strcmp(path, "/ddlfs.log") == 0)
         return 0;
 
-    logmsg(LOG_INFO, "fuse-release: [%s]", path);
+    logmsg(LOG_INFO, "fuse-release: [%s], [%s]", path, get_flagstr(fi->flags));    
 
     int depth = fs_path_create(&part, path);
 	if (depth == -1)

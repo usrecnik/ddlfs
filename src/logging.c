@@ -23,7 +23,7 @@ static void get_datestr(char* datestr, unsigned long bufsize) {
     strftime(datestr, bufsize, "%Y-%m-%d %H:%M:%S", t);
 }
 
-static char* get_levelstr(int level) {
+static const char* get_levelstr(int level) {
     switch(level) {
         case LOG_ERROR: return "ERROR";
         case LOG_INFO:  return "INFO ";
