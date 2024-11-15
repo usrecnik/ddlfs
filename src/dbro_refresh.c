@@ -5,6 +5,7 @@
 #include <string.h>
 #include <fcntl.h>           /* Definition of AT_* constants */
 #ifndef _MSC_VER
+    #include <windows.h>
 	#include <unistd.h>
 	#include <dirent.h>
 #else
@@ -80,12 +81,73 @@ static int dbr_refresh_object(const char *schema,
     return EXIT_SUCCESS;
 }
 
-static int dbr_delete_obsolete() {
-#ifdef _MSC_VER
-	logmsg(LOG_ERROR, "dbr_delete_obsolete() - this function is not yet implemented for Windows platform!");
-	return EXIT_FAILURE;
-#else
+static int dbr_delete_obsolete_entry(const char* fn) {
+
+    size_t name_len = strlen(fn);
+    if (name_len < 5) // ignored files are succeess because failure breaks the loop
+        return EXIT_SUCCESS;
+
+    const char* suffix = fn + name_len - 4;
+    if (strcmp(suffix, ".tmp") != 0)
+        return EXIT_SUCCESS;
+
     char cache_fn[4096];
+    snprintf(cache_fn, 4095, "%s/%s", g_conf._temppath, fn);
+
+    time_t last_ddl_time = 0;
+    time_t mount_stamp = 0;
+    pid_t mount_pid = 0;
+    if (tfs_getldt(cache_fn, &last_ddl_time, &mount_pid, &mount_stamp) != EXIT_SUCCESS) {
+        logmsg(LOG_ERROR, "dbr_delete_obsolete() - tfs_getldt returned error");        
+        return EXIT_FAILURE;
+    }
+
+    if ((mount_pid != g_conf._mount_pid) || (mount_stamp != g_conf._mount_stamp)) {
+        tfs_rmfile(cache_fn);
+        logmsg(LOG_DEBUG, "dbr_delete_obsolete() - removed obsolete cache file [%s]", cache_fn);
+    }
+    
+    return EXIT_SUCCESS;
+}
+
+#ifdef _MSC_VER
+static int dbr_delete_obsolete() {
+    WIN32_FIND_DATA find_data;
+    HANDLE find_handle = FindFirstFileA(g_conf._temppath, &find_data);
+
+    if (find_handle == INVALID_HANDLE_VALUE) {
+        logmsg(LOG_ERROR, "dbr_delete_obsolete() - FindFirstFile(%s) has failed: %d", g_conf._temppath, GetLastError());
+        return EXIT_FAILURE;
+    }
+
+    do {        
+        if (find_data.dwFileAttributes & ~FILE_ATTRIBUTE_NORMAL)            
+            continue;
+
+        const char* fn = find_data.cFileName;
+        if (dbr_delete_obsolete_entry(fn) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "dbr_delete_obsolete() - entry function returned error, aborting.");
+            break;
+        }
+        
+    } while (FindNextFileA(find_handle, &find_data) != 0);
+
+    // Check if the loop ended because there are no more files
+    if (GetLastError() != ERROR_NO_MORE_FILES) {
+        logmsg(LOG_ERROR, "dbr_delete_obsolete() - FindNextFileA failed. Error: %lu", GetLastError());
+        FindClose(find_handle); // ignore result, we've alredy failed.
+        return EXIT_FAILURE;
+    }
+
+    if (!FindClose(find_handle)) {
+        logmsg(LOG_ERROR, "dbr_delete_obsolete() - FindClose failed. Error: %lu", GetLastError());
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+#else
+static int dbr_delete_obsolete() {   
     DIR *dir = opendir(g_conf._temppath);
 
     if (dir == NULL) {
@@ -98,35 +160,19 @@ static int dbr_delete_obsolete() {
         if (dir_entry->d_type != DT_REG)
             continue;
 
-        size_t name_len = strlen(dir_entry->d_name);
-        if (name_len < 5)
-            continue;
-
-        char *suffix = dir_entry->d_name + name_len - 4;
-        if (strcmp(suffix, ".tmp") != 0)
-            continue;
-
-        snprintf(cache_fn, 4095, "%s/%s", g_conf._temppath, dir_entry->d_name);
-
-        time_t last_ddl_time = 0;
-        time_t mount_stamp = 0;
-        pid_t mount_pid = 0;
-        if (tfs_getldt(cache_fn, &last_ddl_time, &mount_pid, &mount_stamp) != EXIT_SUCCESS) {
-            logmsg(LOG_ERROR, "dbr_delete_obsolete() - tfs_getldt returned error");
+        const char* fn = dir_entry->d_name;
+        if (dbr_delete_obsolete_entry(fn) != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "dbr_delete_obsolete() - entry function returned error, aborting.");
             closedir(dir);
-            return EXIT_FAILURE;
+            break;
         }
 
-        if ((mount_pid != g_conf._mount_pid) || (mount_stamp != g_conf._mount_stamp)) {
-            tfs_rmfile(cache_fn);
-            logmsg(LOG_DEBUG, "dbr_delete_obsolete() - removed obsolete cache file [%s]", cache_fn);
-        }
     }
     closedir(dir);
 
     return EXIT_SUCCESS;
-#endif
 }
+#endif
 
 int dbr_refresh_cache() {
     int retval = EXIT_SUCCESS;
