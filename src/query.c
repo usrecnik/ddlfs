@@ -315,12 +315,12 @@ static int qry_object_all_source(const char *schema,
                     if (kw_found != NULL) {
                         kw_which = kw_all[i];
                         kw_after = kw_found + strlen(kw_which);
-                        kw_before = (kw_found == kw_haystack ? NULL : kw_found - 1);
+                        kw_before = (kw_found == kw_haystack_u ? NULL : kw_found - 1);
 
                         if ((kw_after[0] != ' ' && kw_after[0] != '\n' && kw_after[0] != '\r' && kw_after[0] != '\t') ||
                             (kw_before != NULL && kw_before[0] != ' ' && kw_before[0] != '\n' && kw_before[0] != '\r' && kw_before[0] != '\t')) {
                             // so, this is not really a keyword
-                            kw_haystack += strlen(kw_which);
+                            kw_haystack_u += strlen(kw_which);
                             kw_which = NULL;
                             kw_after = NULL;
                             kw_before = NULL;
