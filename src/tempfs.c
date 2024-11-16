@@ -323,32 +323,41 @@ int tfs_rmdir(int ignoreNoDir) {
 }
 #else
 int tfs_rmdir(int ignoreNoDir) {
-	WIN32_FIND_DATA file;
-	HANDLE hFind = NULL;
-	char abs_path[8192];
+    if (_access(g_conf._temppath, 0 != 0)) {
+        logmsg(LOG_INFO, "tfs_rmdir, folder [%s] does not exist (which is OK).", g_conf._temppath);
+        return EXIT_SUCCESS; // it's ok if temppath already does not exist, we've intended to delete it using this function anyway.
+    }
 
-	if ((hFind = FindFirstFile(g_conf._temppath, &file)) == INVALID_HANDLE_VALUE) {
-		if (ignoreNoDir != 1)
-			printf("tfs_rmdir - unable to open directory because it probably doesn't exist (%s)\n", g_conf._temppath);
-		return EXIT_FAILURE;
-	}
+    char abs_path[4096];
+    snprintf(abs_path, 4096, "%s%s*", g_conf._temppath, PATH_SEP);    
+    WIN32_FIND_DATA find_data;
+    HANDLE find_handle = FindFirstFileA(abs_path, &find_data);    
+	    
+    if (find_handle == INVALID_HANDLE_VALUE) {
+        logmsg(LOG_ERROR, "tfs_rmdir - FindFirstFileA has failed to open [%s], error=%lu", abs_path, GetLastError());
+        return EXIT_FAILURE;
+    }
+   
+	do {        
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue; // mostly to skip "." and ".."       
+        
+        snprintf(abs_path, 4096, "%s%s%s", g_conf._temppath, PATH_SEP, find_data.cFileName);
+        if (!DeleteFileA(abs_path))
+            logmsg(LOG_ERROR, "tfs_rmdir - unable to delete file [%s]!", abs_path);       
 
-	do {
-		if (strcmp(file.cFileName, ".") == 0)
-			continue;
+	} while (FindNextFileA(find_handle, &find_data));
+    
+    if (!FindClose(find_handle)) {
+        logmsg(LOG_ERROR, "tfs_rmdir, FindClose returned error=%lu", GetLastError());
+        return EXIT_FAILURE;
+    }
 
-		if (strcmp(file.cFileName, "..") == 0)
-			continue;
-
-		sprintf(abs_path, "%s%s%s", g_conf._temppath, PATH_SEP, file.cFileName);
-		if (!(file.dwFileAttributes &FILE_ATTRIBUTE_DIRECTORY)) {
-			if (!DeleteFileA(abs_path))
-				printf("tfs_rmdir - unable to delete file [%s]!", abs_path);
-		}
-
-	} while (FindNextFile(hFind, &file)); //Find the next file.
-
-	FindClose(hFind); //Always, Always, clean things up!
+    if (!RemoveDirectoryA(g_conf._temppath)) {
+        logmsg(LOG_ERROR, "tfs_rmdir, unable to remove directry (%s), which _should_ be empty at this point.", g_conf._temppath);
+        return EXIT_FAILURE;
+    }
+    
 	return EXIT_SUCCESS;
 }
 #endif

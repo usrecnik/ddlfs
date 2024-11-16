@@ -169,9 +169,12 @@ int main(int argc, char *argv[]) {
     ora_disconnect();
 
     if (g_conf.keepcache == 0) {
-        if (tfs_rmdir(0) != EXIT_SUCCESS) {
-            logmsg(LOG_ERROR, "Unable to remove cache directory after mount (config keepcache=0).");
-        }
+        if (tfs_rmdir(0) != EXIT_SUCCESS)
+            logmsg(LOG_ERROR, "Unable to remove cache directory [%s] after mount (config keepcache=%d).", g_conf._temppath, g_conf.keepcache);
+        else
+            logmsg(LOG_INFO, "Cache directory [%s] successfully removed (config keepcache=%d)", g_conf._temppath, g_conf.keepcache);        
+    } else {
+        logmsg(LOG_INFO, "Cache directory [%s] left intact (config keepcache=%d)", g_conf._temppath, g_conf.keepcache);
     }
 
     return r;
