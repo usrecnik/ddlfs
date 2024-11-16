@@ -61,7 +61,6 @@ static int dbr_refresh_object(const char *schema,
     
     // if cache file is already up2date
     if (tfs_validate2(fname, last_ddl_time) == EXIT_SUCCESS) {
-        printf("tfs_validat2 IS OK SUCCESS.\n");
         // then mark it as verified by this mount
         if (tfs_setldt(fname, last_ddl_time) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "dbr_refresh_object(): unable to mark [%s] [%s].[%s] as verified by this mount.", ora_type, schema, object);
