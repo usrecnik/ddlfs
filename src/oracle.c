@@ -208,11 +208,11 @@ int ora_connect(char* username, char* password, char* database) {
 int ora_disconnect() {
     logmsg(LOG_INFO, "Disconnecting from Oracle Database.");
     
-    logmsg(LOG_DEBUG, ".. freeing handles");
-    OCIHandleFree(g_connection.env, OCI_HTYPE_ENV   );
+    logmsg(LOG_DEBUG, ".. freeing handles");    
     OCIHandleFree(g_connection.err, OCI_HTYPE_ERROR );
     OCIHandleFree(g_connection.srv, OCI_HTYPE_SERVER);
     OCIHandleFree(g_connection.svc, OCI_HTYPE_SVCCTX);
+    OCIHandleFree(g_connection.env, OCI_HTYPE_ENV);
 
     logmsg(LOG_DEBUG, ".. terminating OCI.");
     OCITerminate(OCI_DEFAULT);
