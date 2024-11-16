@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (g_conf._temppath_reused == 1 && g_conf.dbro == 1) {
-        logmsg(LOG_INFO, "Cache validation started beacuase temppath_reused=[%d] and dbro=[%d]", g_conf._temppath_reused, g_conf.dbro);
+        logmsg(LOG_INFO, "Cache validation started because temppath_reused=[%d] and dbro=[%d]", g_conf._temppath_reused, g_conf.dbro);
         if (dbr_refresh_cache() != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "Cache validation failed");
             return EXIT_FAILURE;

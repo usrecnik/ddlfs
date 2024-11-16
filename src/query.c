@@ -456,8 +456,8 @@ static int qry_last_ddl_time(const char *schema,
 "select to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
  from all_objects where owner=:schema and object_type=:type and object_name=:name";
 
-    const char *query_dba = // @todo - do the decode part on client
-"select o.mtime\
+    const char *query_dba =
+"select to_char(o.mtime, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
  from sys.obj$ o\
  join sys.user$ u on u.user# = o.owner#\
  where u.name=:schema and o.type#=:type and o.name=:name";
@@ -509,8 +509,12 @@ static int qry_last_ddl_time(const char *schema,
     }
     ORA_STMT_BIND_STR(qry_last_ddl_time, 3, object);
     ORA_STMT_EXECUTE(qry_last_ddl_time, 0);
-    if (ORA_STMT_FETCH) {
+    if (ORA_STMT_FETCH) {        
         *last_ddl_time = utl_str2time(ORA_VAL(last_str_time));
+        if (*last_ddl_time < 0) {
+            logmsg(LOG_ERROR, "qry_last_ddl_time: unable to parse last_str_time=[%s]", ORA_VAL(last_str_time));
+            retval = EXIT_FAILURE;
+        }
     } else {
         logmsg(LOG_ERROR, "Unable to obtain last_ddl_time for [%s].[%s] (%s) -> no such object in all_objects", schema, object, type);
         retval = EXIT_FAILURE;

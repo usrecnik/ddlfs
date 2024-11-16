@@ -23,8 +23,7 @@
 static int dbr_refresh_object(const char *schema,
                               const char *ora_type,
                               const char *object,
-                              time_t last_ddl_time) {
-
+                              time_t last_ddl_time) {    
     char object_with_suffix[300];
 
     // convert oracle type to filesystem type
@@ -34,7 +33,7 @@ static int dbr_refresh_object(const char *schema,
         return EXIT_FAILURE;
     }
     utl_ora2fstype(&fs_type);
-
+    
     // get suffix based on type
     char *suffix = NULL;
     if (str_suffix(&suffix, ora_type) != EXIT_SUCCESS) {
@@ -46,7 +45,7 @@ static int dbr_refresh_object(const char *schema,
         return EXIT_FAILURE;
     }
     snprintf(object_with_suffix, 299, "%s%s", object, suffix);
-
+    
     // get cache filename
     char *fname = NULL;
     if (qry_object_fname(schema, fs_type, object_with_suffix, &fname) != EXIT_SUCCESS) {
@@ -59,9 +58,10 @@ static int dbr_refresh_object(const char *schema,
             free(fs_type);
         return EXIT_FAILURE;
     }
-
+    
     // if cache file is already up2date
     if (tfs_validate2(fname, last_ddl_time) == EXIT_SUCCESS) {
+        printf("tfs_validat2 IS OK SUCCESS.\n");
         // then mark it as verified by this mount
         if (tfs_setldt(fname, last_ddl_time) != EXIT_SUCCESS) {
             logmsg(LOG_ERROR, "dbr_refresh_object(): unable to mark [%s] [%s].[%s] as verified by this mount.", ora_type, schema, object);
@@ -74,7 +74,7 @@ static int dbr_refresh_object(const char *schema,
             return EXIT_FAILURE;
         }
     }
-
+    
     free(fname);
     free(suffix);
     free(fs_type);
@@ -82,7 +82,6 @@ static int dbr_refresh_object(const char *schema,
 }
 
 static int dbr_delete_obsolete_entry(const char* fn) {
-
     size_t name_len = strlen(fn);
     if (name_len < 5) // ignored files are succeess because failure breaks the loop
         return EXIT_SUCCESS;
@@ -92,7 +91,7 @@ static int dbr_delete_obsolete_entry(const char* fn) {
         return EXIT_SUCCESS;
 
     char cache_fn[4096];
-    snprintf(cache_fn, 4095, "%s/%s", g_conf._temppath, fn);
+    snprintf(cache_fn, 4095, "%s%s%s", g_conf._temppath, PATH_SEP, fn);
 
     time_t last_ddl_time = 0;
     time_t mount_stamp = 0;
@@ -103,7 +102,8 @@ static int dbr_delete_obsolete_entry(const char* fn) {
     }
 
     if ((mount_pid != g_conf._mount_pid) || (mount_stamp != g_conf._mount_stamp)) {
-        tfs_rmfile(cache_fn);
+        if (tfs_rmfile(cache_fn) != EXIT_SUCCESS)
+            return EXIT_FAILURE;
         logmsg(LOG_DEBUG, "dbr_delete_obsolete() - removed obsolete cache file [%s]", cache_fn);
     }
     
@@ -112,17 +112,20 @@ static int dbr_delete_obsolete_entry(const char* fn) {
 
 #ifdef _MSC_VER
 static int dbr_delete_obsolete() {
+
+    char abs_path[4096];
+    snprintf(abs_path, 4096, "%s%s*", g_conf._temppath, PATH_SEP);
     WIN32_FIND_DATA find_data;
-    HANDLE find_handle = FindFirstFileA(g_conf._temppath, &find_data);
+    HANDLE find_handle = FindFirstFileA(abs_path, &find_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
-        logmsg(LOG_ERROR, "dbr_delete_obsolete() - FindFirstFile(%s) has failed: %d", g_conf._temppath, GetLastError());
+        logmsg(LOG_ERROR, "dbr_delete_obsolete() - FindFirstFile(%s) has failed: %d", abs_path, GetLastError());
         return EXIT_FAILURE;
     }
 
-    do {        
-        if (find_data.dwFileAttributes & ~FILE_ATTRIBUTE_NORMAL)            
-            continue;
+    do {
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue; // skip directories, this includes "." and ".."
 
         const char* fn = find_data.cFileName;
         if (dbr_delete_obsolete_entry(fn) != EXIT_SUCCESS) {

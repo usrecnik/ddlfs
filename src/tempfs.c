@@ -100,7 +100,7 @@ int tfs_setldt(const char *path, time_t last_ddl_time) {
         free(meta_fn);
         return EXIT_FAILURE;
     }
-
+    
     free(meta_fn);
     return EXIT_SUCCESS;
 }
@@ -114,7 +114,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
             free(meta_fn);
         return EXIT_FAILURE;
     }
-
+        
     FILE *fp = fopen(meta_fn, "r");
     if (fp == NULL) {
         logmsg(LOG_ERROR, "tfs_getldf - unable to open meta file [%s]: %d - %s", meta_fn, errno, strerror(errno));
@@ -133,7 +133,7 @@ int tfs_getldt(const char *path, time_t *last_ddl_time, pid_t *mount_pid, time_t
         fclose(fp);
         free(meta_fn);
         return EXIT_FAILURE;
-    }
+    }    
 
     if (mount_pid != NULL && mount_stamp != NULL) {
         len = fread(mount_pid, 1, sizeof(pid_t), fp);
@@ -247,21 +247,26 @@ int tfs_validate2(const char *cache_fn, time_t last_ddl_time) {
     // check if tempfile already exist and has atime equal to last_modified_time.
     // there is no need to recreate tempfile if times (atime & last_modified_time) match.
     if (access(cache_fn, F_OK) == -1 ) {
-        logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] does not (yet) exist.", cache_fn);
+        // logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] does not (yet) exist.", cache_fn); // too verbose for general use
         return EXIT_FAILURE;
     }
 
     if (tfs_getldt(cache_fn, &cached_time, NULL, NULL) != EXIT_SUCCESS) {
-        logmsg(LOG_ERROR, "tfs_validate - unable to read cached last_ddl_time for [%s]!", cache_fn);
+        logmsg(LOG_ERROR, "tfs_validate2 - unable to read cached last_ddl_time for [%s]!", cache_fn);
         return EXIT_FAILURE;
-    }
+    }   
+
+    // Convert to a human-readable string
+    //char* readable_time = ctime(&current_time);
+    //printf("Human-readable time: %s", readable_time);
+    //
 
     if (cached_time == last_ddl_time) {
-        logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is already up2date.", cache_fn);
+        logmsg(LOG_DEBUG, "tfs_validate2 - cache file [%s] is already up2date.", cache_fn);
         return EXIT_SUCCESS;
     }
     
-    logmsg(LOG_DEBUG, "tfs_validate - cache file [%s] is outdated.", cache_fn);
+    logmsg(LOG_DEBUG, "tfs_validate2 - cache file [%s] is outdated.", cache_fn);
     return EXIT_FAILURE;
 }
 
@@ -353,6 +358,7 @@ int tfs_rmdir(int ignoreNoDir) {
         return EXIT_FAILURE;
     }
 
+    // this should fail if the directory is not empty.
     if (!RemoveDirectoryA(g_conf._temppath)) {
         logmsg(LOG_ERROR, "tfs_rmdir, unable to remove directry (%s), which _should_ be empty at this point.", g_conf._temppath);
         return EXIT_FAILURE;
