@@ -329,7 +329,7 @@ int tfs_rmdir(int ignoreNoDir) {
 #else
 int tfs_rmdir(int ignoreNoDir) {
     if (_access(g_conf._temppath, 0 != 0)) {
-        logmsg(LOG_INFO, "tfs_rmdir, folder [%s] does not exist (which is OK).", g_conf._temppath);
+        logmsg(LOG_DEBUG, "tfs_rmdir, folder [%s] does not exist (which is OK).", g_conf._temppath);
         return EXIT_SUCCESS; // it's ok if temppath already does not exist, we've intended to delete it using this function anyway.
     }
 
