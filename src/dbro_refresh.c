@@ -5,7 +5,6 @@
 #include <string.h>
 #include <fcntl.h>           /* Definition of AT_* constants */
 #ifndef _MSC_VER
-    #include <windows.h>
 	#include <unistd.h>
 	#include <dirent.h>
 #else
