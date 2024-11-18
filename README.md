@@ -135,7 +135,7 @@ has a bit of performance penalty as `ddlfs` must read contents of every object o
 Possible alternative is to set this parameter to any value larger then any database object, e.g. to `10485760`, this is 10mb, which should be
 enough in most cases). Note that this may also confuse some applications.
 
-**`volname`=**`DOKAN`
+**`volname`=**`DOKAN`  
 (Windows only) Name of Windows Volume. It is what Explorer displays next to drive letter, e.g. `X: (MY_PROD_DB)`.
 
 Tips for VIM
@@ -167,8 +167,8 @@ performance try to use following mount options (and (re)mount before each `git a
 Subversion won't work because it wants to create `.svn` subfolder in *every* folder. Problem is that ddlfs only
 supports storing of DDL in `.SQL` files. (Git and Mercurial only require one folder bellow mountpoint and that's all)
 
-Compiling
----------
+Compiling on Linux
+------------------
 1. Download Oracle Instant Client (Basic + SDK Package):  
 http://www.oracle.com/technetwork/database/database-technologies/instant-client/overview/index.html
 
@@ -179,3 +179,25 @@ http://www.oracle.com/technetwork/database/database-technologies/instant-client/
 3. Extract both files to the _same_ location, which is specified in `Makefile` (on line which starts with `LD_LIBRARY_PATH=...`)
 
 4. Run `make clean all` from `./src/` folder.
+
+Compiling on Windows
+--------------------
+
+Before you can build on Windows, you need to install the following:
+
+* Visual Studio 2022 (Desktop development with C++)
+* Dokan (https://dokan-dev.github.io/, I used version 2.2.0.1000)
+  * Select Development (Headers and Libs, Symbols) besides "Dokan Core".
+* Oracle Instant Client (basic+sdk) and put it besides ddlfs folder (e.g. `C:\Users\test\repos\instant_client_23_6`)
+* run `dotnet tool install --global wix` (only needed for building ddlfs-bundle.exe install package, I've tested with 5.0.2+aa65968c version)
+  * run `wix extension add -g WixToolset.BootstrapperApplications.wixext` (needed to create installer bundle of stuff just described)
+
+finally, you can run:
+
+```
+nmake -f Makefile.win
+nmake -f Makefile.win release
+```
+
+The first command produces `ddlfs.exe` and the second one creates .msi package and bundles it with everything else together into `ddlfs-bundle.exe`.
+
