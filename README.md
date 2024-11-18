@@ -8,7 +8,7 @@
 
 Installation
 ------------
-`apt install ./ddlfs-<ver>.deb`
+`apt install ./ddlfs-<ver>.deb`  
 `dnf install ./ddlfs-<ver>.rpm`
 
 ### Version 3.x compatibility (beta!)
