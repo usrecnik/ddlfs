@@ -8,10 +8,27 @@
 
 Installation
 ------------
-`apt install ./ddlfs-<ver>.deb`  
-`yum localinstall --nogpgcheck ddlfs-<ver>.rpm`
+`apt install ./ddlfs-<ver>.deb`
+`dnf install ./ddlfs-<ver>.rpm`
 
-`.rpm` and `.deb` packages were tested on:
+### Version 3.x compatibility (beta!)
+
+This is the first release to support both, Windows (MSVC/Dokan) and Linux (GCC/libfuse3) environments.
+
+* Windows 10, 11
+* Ubuntu 24.04, 22.04 (for 24.04 use `ddlfs-<ver>-ubuntu24.deb` package)
+* Debian 12.0
+* Oracle Linux 9
+
+This release is based on:
+* [libfuse3](https://github.com/libfuse/libfuse) (linux) and [Dokan](https://github.com/dokan-dev/dokany)
+* [Oracle Instant Client 23.6](https://www.oracle.com/database/technologies/instant-client/downloads.html)
+
+Use older releases for systems, which are older than described.
+
+Supported database versions are >= 19c according to MOS 207303.1.
+
+### Version 2.3 compatibility
 
 * Ubuntu 16.4 and 18.4
 * Oracle Enterprise Linux 6.0 and 7.5
@@ -19,7 +36,6 @@ Installation
 Older/other versions might need to compile from source (due to different libc and fuse versions).
 
 Supported Oracle Database versions are 10g, 11g, 12c, 18c.
-
 
 Usage
 -----
