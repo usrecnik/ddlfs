@@ -135,6 +135,9 @@ has a bit of performance penalty as `ddlfs` must read contents of every object o
 Possible alternative is to set this parameter to any value larger then any database object, e.g. to `10485760`, this is 10mb, which should be
 enough in most cases). Note that this may also confuse some applications.
 
+**`volname`=**`DOKAN`
+(Windows only) Name of Windows Volume. It is what Explorer displays next to drive letter, e.g. `X: (MY_PROD_DB)`.
+
 Tips for VIM
 ------------
 If you are using VIM editor to edit files mounted with this filesystem, then you will wan to put following to your `.vimrc`.
