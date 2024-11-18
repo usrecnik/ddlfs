@@ -23,7 +23,7 @@
 #include "tempfs.h"
 #include "dbro_refresh.h"
 
-#define DDLFS_VERSION "3.0"
+#define DDLFS_VERSION "3.0-RC1"
 
 // extern's from logging.h:
 char *g_ddl_log_buf;   // contents of in-memory "ddlfs.log"
