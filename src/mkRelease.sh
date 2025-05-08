@@ -43,11 +43,11 @@ function proc_deb() {
 
     case "$1" in
         ubuntu24)
-            l_deps='libfuse3-3, libaio1t64'
+            l_deps='fuse3, libaio1t64'
             ;;
 
         debian)
-            l_deps='libfuse3-3, libaio1'
+            l_deps='fuse3, libaio1'
             ;;
     esac
 
