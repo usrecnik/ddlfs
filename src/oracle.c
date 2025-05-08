@@ -87,7 +87,7 @@ static int qry_catalog_role() {
 "select sum(cnt) as cnt from ( \
 select count(*) as cnt from user_role_privs where granted_role='SELECT_CATALOG_ROLE' \
 union all \
-select count(*) as cnt from user_sys_privs where privilege='SELECT ANY DICTIONARY' ";
+select count(*) as cnt from user_sys_privs where privilege='SELECT ANY DICTIONARY' ) ";
 
     int retval = EXIT_SUCCESS;
 
