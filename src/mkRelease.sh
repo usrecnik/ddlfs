@@ -11,7 +11,8 @@ PKG_MAIN='"Urh Srecnik" <urh.srecnik@abakus.si>'
 PKG_DESC='Filesystem which represents Oracle Database objects as their DDL stored in .sql files.'
 PKG_FULL_NAME="${PKG_NAME}-${PKG_VERS}"
 INSTANT_CLIENT_PATH="$(cat Makefile  | grep '^export LD_LIBRARY_PATH' | cut -d'=' -f2)"
-PKG_TYPE="${1:-ALL}"
+PKG_TYPE="${1}"
+PKG_DISTRO="${2}" # el7, el8, el9, ubuntu24, debian
 
 function proc_copy() {
     rm -rf ../target/${PKG_FULL_NAME}
@@ -46,7 +47,7 @@ function proc_deb() {
             l_deps='fuse3, libaio1t64'
             ;;
 
-        debian)
+        *)
             l_deps='fuse3, libaio1'
             ;;
     esac
@@ -121,7 +122,7 @@ function proc_rpm() {
     mv x86_64/*.rpm ./
     rm *.spec
     rm -r x86_64 
-    mv *.rpm ${PKG_FULL_NAME}.rpm
+    mv *.x86_64.rpm ${PKG_FULL_NAME}-${1}.rpm
     popd
 }
 
@@ -135,19 +136,12 @@ echo "--------------------------------"
 proc_copy
 
 case "$PKG_TYPE" in
-    "ALL")
-        proc_deb 'ubuntu24'
-        proc_deb 'debian'
-        proc_rpm
-        ;;
-
     "DEB")
-        proc_deb 'ubuntu24'
-        proc_deb 'debian'
+        proc_deb "$PKG_DISTRO"
         ;;
 
     "RPM")
-        proc_rpm
+        proc_rpm "$PKG_DISTRO"
         ;;
 
     *)
