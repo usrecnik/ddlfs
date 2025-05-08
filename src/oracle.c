@@ -82,6 +82,26 @@ ora_get_open_mode_cleanup:
     return retval;
 }
 
+static int qry_catalog_role() {
+    const char *query =
+"select sum(cnt) as cnt from ( \
+select count(*) as cnt from user_role_privs where granted_role='SELECT_CATALOG_ROLE' \
+union all \
+select count(*) as cnt from user_sys_privs where privilege='SELECT ANY DICTIONARY' ";
+
+    int retval = EXIT_SUCCESS;
+
+    ORA_STMT_PREPARE(qry_catalog_role);
+    ORA_STMT_DEFINE_INT(qry_catalog_role, 1,  cnt);
+    ORA_STMT_EXECUTE(qry_catalog_role, 1);
+
+    g_conf._has_catalog_role = ORA_VAL(cnt) > 0;
+
+qry_catalog_role_cleanup:
+    ORA_STMT_FREE;
+    return retval;
+}
+
 int ora_connect(char* username, char* password, char* database) {
 	sword r = 0;
 
@@ -198,6 +218,20 @@ int ora_connect(char* username, char* password, char* database) {
         
         if (o_stm != NULL)
             ora_stmt_free(o_stm);
+    }
+
+    if (g_conf._isdba == 1)
+        g_conf._has_catalog_role = 1;
+    else {
+        if (qry_catalog_role() != EXIT_SUCCESS) {
+            logmsg(LOG_ERROR, "Unable to query if user has catalog role.");
+            return EXIT_FAILURE;
+        }
+
+        if (g_conf._has_catalog_role)
+            logmsg(LOG_INFO, "Current user has SELECT_CATALOG_ROLE or SELECT ANY DICTIONARY privilege.");
+        else
+            logmsg(LOG_INFO, "Current user does not have access to dba_* views.");
     }
 
     logmsg(LOG_INFO, ".. connected to database server.");

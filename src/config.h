@@ -21,6 +21,7 @@ struct s_global_config {
     char  *_temppath;
     int    _server_version;
     int    _isdba;
+    int    _has_catalog_role;
 #ifndef _MSC_VER
     pid_t  _mount_pid;
 #else
