@@ -286,31 +286,27 @@ sword ora_stmt_define(OCIStmt *stm, OCIDefine **def, ub4 pos, void *value, sb4 v
     sword r = OCIDefineByPos(
         stm, def, g_connection.err, pos, value, value_size, dty,  
         0, 0, 0, OCI_DEFAULT);
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
 
 sword ora_stmt_define_i(OCIStmt *stm, OCIDefine **def, ub4 pos, void *value, sb4 value_size, ub2 dty, dvoid *indp) {
     sword r = OCIDefineByPos(
         stm, def, g_connection.err, pos, value, value_size, dty, indp, 0, 0, OCI_DEFAULT);
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
 
 sword ora_stmt_bind(OCIStmt *stm, OCIBind **bnd, ub4 pos, void *value, sb4 value_size, ub2 dty) {
     sword r = OCIBindByPos(
         stm, bnd, g_connection.err, pos, value, value_size, dty, 
         0, 0, 0, 0, 0, OCI_DEFAULT);
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
 
 sword ora_stmt_execute(OCIStmt *stm, ub4 iters) {
     sword r = OCIStmtExecute(
         g_connection.svc, stm, g_connection.err, iters,
         0, 0, 0, OCI_DEFAULT);
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
 
 sword ora_stmt_fetch(OCIStmt *stm) {
@@ -319,25 +315,20 @@ sword ora_stmt_fetch(OCIStmt *stm) {
         0, OCI_DEFAULT);
     if (r == OCI_NO_DATA)
         return r;
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
 
 sword ora_stmt_free(OCIStmt *stm) {
     sword r = OCIHandleFree(stm, OCI_HTYPE_STMT);
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
 
 sword ora_lob_alloc(OCILobLocator **lob) {
     sword r = OCIDescriptorAlloc(g_connection.env, (void **) lob, OCI_DTYPE_LOB, 0, 0);
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
 
 sword ora_lob_free(OCILobLocator *lob)  {
     sword r = OCIDescriptorFree(lob, OCI_DTYPE_LOB);
-    ora_check(r);
-    return r;
+    return ora_check(r);
 }
-
