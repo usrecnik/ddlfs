@@ -24,6 +24,11 @@ int utl_fs2oratype(char **fstype);
  * */
 int utl_ora2fstype(char **oratype);
 
+/**
+ * Replace every occurrence of " all_" with " dba_" if g_conf._has_catalog_role == 1.
+ */
+void ora_replace_all_dba(char *query);
+
 #ifdef _MSC_VER
 /**
  * Implementation of strcasecmp() as found in strings.h. It's here becasue

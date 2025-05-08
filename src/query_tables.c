@@ -57,9 +57,11 @@ static void deflist_free(struct deflist *curr) {
 }
 
 static int tab_all_tables(const char *schema, const char *table, struct tabledef *def) {
-    const char *query =
+    char query[] =
 "select t.\"TEMPORARY\"\
  from all_tables t where t.owner=:bind_owner and t.table_name=:bind_name";
+
+    ora_replace_all_dba(query);
 
     int retval = EXIT_SUCCESS;
 
@@ -87,11 +89,13 @@ tab_all_tables_cleanup:
 }
 
 static int tab_all_tab_columns(const char *schema, const char *table, struct tabledef *def) {
-    const char *query =
+    char query[] =
 "select column_name, data_type, data_length, data_precision, data_scale, nullable,\
  default_length, data_default, char_length, char_used\
  from all_tab_columns where owner=:bind_owner and table_name=:bind_name\
  order by column_id";
+
+    ora_replace_all_dba(query);
 
     int retval = EXIT_SUCCESS;
 
@@ -213,6 +217,8 @@ static int tab_all_constraints(const char *schema, const char *table, struct tab
     char query[4096];
     snprintf(query, 4096, query_template, (g_conf._server_version < 1102 ? listagg_10 : listagg_11));
 
+    ora_replace_all_dba(query);
+
     int retval = EXIT_SUCCESS;
     def->constraints = NULL;
 
@@ -315,7 +321,7 @@ tab_all_constraints_cleanup:
 
 int tab_all_indexes(const char *schema, const char *table, struct tabledef *def) {
 
-    const char *query =
+    char query[] =
 "select ai.owner, ai.index_name, ai.index_type, ai.uniqueness, ai.compression, ai.prefix_length,\
  ic.column_name, ic.descend as column_descend,\
  ie.column_expression as expression_string\
@@ -325,6 +331,8 @@ int tab_all_indexes(const char *schema, const char *table, struct tabledef *def)
  and ie.index_name = ai.index_name and ie.column_position=ic.column_position\
  where ai.table_owner=:bind_owner and ai.table_name=:bind_name\
  order by ai.owner, ai.index_name, ic.column_position";
+
+    ora_replace_all_dba(query);
 
     int retval = EXIT_SUCCESS;
 

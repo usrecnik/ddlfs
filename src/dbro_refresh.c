@@ -177,7 +177,7 @@ static int dbr_delete_obsolete() {
 
 int dbr_refresh_cache() {
     int retval = EXIT_SUCCESS;
-    const char *query =
+    char query[] =
 "select o.owner, o.object_type, o.object_name, \
  to_char(o.last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
  from all_objects o\
@@ -194,6 +194,8 @@ int dbr_refresh_cache() {
  'TYPE',\
  'TYPE BODY',\
  'JAVA SOURCE')";
+
+    ora_replace_all_dba(query);
 
     ORA_STMT_PREPARE(dbr_refresh_state);
     ORA_STMT_DEFINE_STR_I(dbr_refresh_state, 1, schema, 300);

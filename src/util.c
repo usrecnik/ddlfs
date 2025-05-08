@@ -13,6 +13,7 @@
 #endif
 
 #include "logging.h"
+#include "config.h"
 
 #ifdef _MSC_VER
 	#define strdup _strdup	
@@ -107,6 +108,20 @@ int utl_ora2fstype(char **oratype) {
 
     *oratype = type;
     return EXIT_SUCCESS;
+}
+
+void ora_replace_all_dba(char *query) {
+	if (g_conf._has_catalog_role == 0)
+		return;
+
+	const char *needle = " all_";
+	const char *replacement = " dba_";
+	size_t len = strlen(needle);
+
+	while ((query = strstr(query, needle)) != NULL) {
+		memcpy(query, replacement, len);  // safe: same length
+		query += len;
+	}
 }
 
 #ifdef _MSC_VER

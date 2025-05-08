@@ -193,6 +193,8 @@ static int qry_object_all_source(const char *schema,
             snprintf(query, 1024, query_fmt, "o.\"EDITIONABLE\" as e");
     }
 
+    ora_replace_all_dba(query);
+
     FILE *fp = NULL;
 
     ORA_STMT_PREPARE (qry_object_all_source);
@@ -452,7 +454,7 @@ static int qry_last_ddl_time(const char *schema,
                              const char *object,
                              time_t *last_ddl_time /* out */) {
 
-    const char *query_user =
+    char query_user[] =
 "select to_char(last_ddl_time, 'yyyy-mm-dd hh24:mi:ss') as last_ddl_time\
  from all_objects where owner=:schema and object_type=:type and object_name=:name";
 
@@ -461,6 +463,8 @@ static int qry_last_ddl_time(const char *schema,
  from sys.obj$ o\
  join sys.user$ u on u.user# = o.owner#\
  where u.name=:schema and o.type#=:type and o.name=:name";
+
+    ora_replace_all_dba(query_user);
 
     const char *query = (g_conf._isdba == 1 ? query_dba : query_user);
 
@@ -844,6 +848,8 @@ from all_objects o where o.owner=:bind_owner and o.object_type=:bind_type and ge
 select 1 from all_source s \
 where s.owner='SYS' and s.\"TYPE\"='TYPE' AND s.\"NAME\"=o.object_name)");
     }
+
+    ora_replace_all_dba(query);
 
     if (str_suffix(&suffix, type_name) != EXIT_SUCCESS) {
         logmsg(LOG_ERROR, "qry_objects() - Unable to obtain suffix for object type [%s]", type_name);
